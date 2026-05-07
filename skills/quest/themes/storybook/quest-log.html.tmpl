@@ -56,6 +56,19 @@
   .meta-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; font-family: 'Quicksand'; font-size: 13.2px; color: #7a5a3a; font-weight: 600; }
   .row .ch-prog { display: none; }
   .row.current .ch-prog { display: flex; }
+
+  /* Filter bar — storybook */
+  .filters { display: flex; gap: 8px; padding: 12px 0 24px; flex-wrap: wrap; justify-content: center; max-width: 880px; margin: 0 auto; }
+  .filt { padding: 6px 16px; background: #fbf3df; border: 2px solid #4a2e1a; font-family: 'Eczar', serif; font-weight: 700; font-size: 13.2px; color: #4a2e1a; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background 0.15s ease; }
+  .filt:hover { background: #f3e6c4; }
+  .filt:focus-visible { outline: 2px solid #c44a2a; outline-offset: 2px; }
+  .filt.on { background: #c44a2a; color: #fbf3df; border-color: #4a2e1a; }
+  .filt .count { display: inline-block; margin-left: 5px; padding: 0 6px; background: rgba(0,0,0,0.12); font-size: 11px; font-style: italic; }
+  .filt.on .count { background: rgba(255,255,255,0.25); }
+  /* Status-based filtering */
+  body[data-filter="active"]  .row.done,    body[data-filter="active"]  .row.locked  { display: none; }
+  body[data-filter="visited"] .row.current, body[data-filter="visited"] .row.locked  { display: none; }
+  body[data-filter="sealed"]  .row.current, body[data-filter="sealed"]  .row.done    { display: none; }
 </style>
 </head>
 <body>
@@ -87,6 +100,13 @@
     <p class="toc-sub">a complete index, with notations on those completed, present, and yet to come</p>
     <div class="ornament">❦ ⁂ ❦</div>
 
+    <div class="filters" role="tablist" aria-label="Filter chapters by status">
+      <button class="filt on" type="button" data-filter="all" role="tab" aria-selected="true">All <span class="count">{{counts.total}}</span></button>
+      <button class="filt" type="button" data-filter="active" role="tab" aria-selected="false">Reading <span class="count">{{counts.current}}</span></button>
+      <button class="filt" type="button" data-filter="visited" role="tab" aria-selected="false">Read <span class="count">{{counts.done}}</span></button>
+      <button class="filt" type="button" data-filter="sealed" role="tab" aria-selected="false">Sealed <span class="count">{{counts.locked}}</span></button>
+    </div>
+
     <div class="toc">
       {{#each quests}}
       <a class="row {{q.status_class}}" href="plan-card.html?ch={{q.n}}">
@@ -117,5 +137,30 @@
     <div class="ornament">❦ ⁂ ❦</div>
   </div>
 </div>
+<script>
+(function() {
+  var VALID = ['all', 'active', 'visited', 'sealed'];
+  var btns = document.querySelectorAll('.filt');
+  function setFilter(name) {
+    if (VALID.indexOf(name) === -1) name = 'all';
+    document.body.setAttribute('data-filter', name);
+    btns.forEach(function(b) {
+      var on = b.dataset.filter === name;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (name === 'all') {
+      history.replaceState(null, '', location.pathname + location.search);
+    } else if (location.hash !== '#' + name) {
+      history.replaceState(null, '', location.pathname + location.search + '#' + name);
+    }
+  }
+  btns.forEach(function(b) {
+    b.addEventListener('click', function() { setFilter(b.dataset.filter); });
+  });
+  setFilter((location.hash || '').slice(1) || 'all');
+  window.addEventListener('hashchange', function() { setFilter((location.hash || '').slice(1) || 'all'); });
+})();
+</script>
 </body>
 </html>
