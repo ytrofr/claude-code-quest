@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a new theme, view, or capability
+title: "[feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas welcome. The clearer the use case, the more likely it ships.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What's the feature?
+      description: One sentence describing what you want.
+      placeholder: "A 'minimalist' theme — black on white, no SVG decoration, monospace fonts."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter? (use case)
+      description: What problem does this solve for you specifically?
+      placeholder: "I want to display this on an e-ink Kindle dashboard — current themes are too colorful."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      placeholder: "Tried overriding pokemon CSS via user stylesheet but the SVG landmarks still render in color."
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: What kind of feature?
+      options:
+        - New theme
+        - New view (beyond route / quest-log / plan-card)
+        - Schema field
+        - CLI subcommand
+        - Hook / parser improvement
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Are you interested in contributing this?
+      options:
+        - label: I'd like to submit a PR for this

@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: "Claude Code Quest"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: Yatir
+    family-names: Ofer
+    email: yatirofer@gmail.com
+repository-code: "https://github.com/ytrofr/claude-code-quest"
+url: "https://github.com/ytrofr/claude-code-quest"
+abstract: >-
+  RPG-style project roadmap dashboard for Claude Code users. Renders central
+  quests.json into themed HTML maps (Pokémon, Storybook), parses plan-file
+  checkboxes for auto-progress, supports drop-in themes via folder-based
+  contract. Zero LLM calls, zero external dependencies, localhost-only.
+keywords:
+  - claude-code
+  - anthropic
+  - project-management
+  - roadmap
+  - dashboard
+  - rpg
+  - gamification
+  - developer-tools
+  - productivity
+  - multi-project
+  - kanban-alternative
+  - self-hosted
+license: MIT
+version: "1.2.0"
+date-released: "2026-05-07"

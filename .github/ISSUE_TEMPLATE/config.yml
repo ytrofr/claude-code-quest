@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the docs first
+    url: https://github.com/ytrofr/claude-code-quest#install
+    about: Install steps, schema reference, theming guide, FAQ — most questions are answered there.
+  - name: Browse open issues
+    url: https://github.com/ytrofr/claude-code-quest/issues
+    about: Someone may have already reported your bug or asked your question.
