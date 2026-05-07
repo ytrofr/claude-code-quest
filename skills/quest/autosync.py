@@ -71,12 +71,15 @@ def slug(text: str) -> str:
 
 def detect_project(plan_path: Path) -> str | None:
     """3-tier resolution: BLUF Project: line → cwd-vs-registry → None."""
-    # Tier 1: BLUF "Project:" or "Branch:" line
+    # Tier 1: BLUF "Project:" or "Branch:" line — tolerates markdown prefixes:
+    #   leading whitespace, `>` blockquote, `-`/`*` bullet, single or combined.
+    # Examples that match: "**Project**: ogas", "> **Project**: ogas",
+    #   "  - Project: ogas", "Project: ogas"
     try:
         text = plan_path.read_text(encoding="utf-8", errors="ignore")
-        m = re.search(r"^\s*[\*-]?\s*\*\*Project\*\*\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)
+        m = re.search(r"^[\s>*\-]*\*\*Project\*\*\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)
         if not m:
-            m = re.search(r"^\s*Project\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)
+            m = re.search(r"^[\s>*\-]*Project\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)
         if m:
             cand = m.group(1).strip("`\"' ").lower()
             return cand
