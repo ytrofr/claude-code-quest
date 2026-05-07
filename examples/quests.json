@@ -1,0 +1,129 @@
+{
+  "_doc": "Sample quests.json — drop into ~/.claude/quest/data/ to bootstrap the dashboard. Three fictional projects demonstrating both themes + v2 schema features (tasks list, branch, tags, KPI, why, depends_on).",
+  "version": 2,
+  "level_threshold": 100,
+  "xp_per_quest": 25,
+  "projects": {
+    "apollo": {
+      "name": "Apollo",
+      "subtitle": "User-facing dashboard",
+      "theme": "pokemon",
+      "level": 2,
+      "xp": {"current": 50, "max": 100},
+      "quests": [
+        {
+          "id": "design-system", "n": 1, "name": "Design Town", "desc": "Build the component library",
+          "landmark": "house", "status": "done", "progress": 1.0, "xp_reward": 25,
+          "plan": "apollo-design-system.md", "next_step": ""
+        },
+        {
+          "id": "auth-flow", "n": 2, "name": "Auth Tower", "desc": "OAuth + email login",
+          "landmark": "tower", "status": "done", "progress": 1.0, "xp_reward": 25,
+          "plan": "apollo-auth.md", "next_step": ""
+        },
+        {
+          "id": "dashboard-v1", "n": 3, "name": "Dashboard Mill", "desc": "First version of the user home screen",
+          "landmark": "mill", "status": "current", "progress": 0.6, "xp_reward": 25,
+          "plan": "apollo-dashboard-v1.md",
+          "next_step": "Wire chart library + ship to staging",
+          "why": "Users have nowhere to land after login — dashboard is the first impression.",
+          "branch": "feat/dashboard-v1",
+          "tags": ["frontend", "core"],
+          "kpi": "TTI < 1.5s on dashboard route",
+          "tasks": [
+            {"title": "Scaffold dashboard route", "done": true},
+            {"title": "Build chart components", "done": true},
+            {"title": "Wire data loaders", "done": false},
+            {"title": "Ship to staging behind flag", "done": false}
+          ],
+          "effort": {"estimate_hr": 8, "actual_hr": 4.5}
+        },
+        {
+          "id": "settings-page", "n": 4, "name": "Settings Bridge", "desc": "User preferences + account",
+          "landmark": "bridge", "status": "locked", "progress": 0.0, "xp_reward": 25,
+          "plan": "apollo-settings.md", "next_step": "",
+          "depends_on": ["dashboard-v1"]
+        },
+        {
+          "id": "billing", "n": 5, "name": "Billing Camp", "desc": "Stripe checkout + invoice download",
+          "landmark": "camp", "status": "locked", "progress": 0.0, "xp_reward": 25,
+          "plan": "apollo-billing.md", "next_step": ""
+        }
+      ]
+    },
+    "atlas": {
+      "name": "Atlas",
+      "subtitle": "Geospatial query engine",
+      "theme": "storybook",
+      "level": 1,
+      "xp": {"current": 50, "max": 100},
+      "quests": [
+        {
+          "id": "tile-server", "n": 1, "name": "The Tile Hut", "desc": "Vector tile cache layer",
+          "landmark": "house", "status": "done", "progress": 1.0, "xp_reward": 25,
+          "plan": "atlas-tile-server.md", "next_step": ""
+        },
+        {
+          "id": "spatial-index", "n": 2, "name": "The Index Tower", "desc": "R-tree for coordinate lookups",
+          "landmark": "tower", "status": "done", "progress": 1.0, "xp_reward": 25,
+          "plan": "atlas-spatial-index.md", "next_step": ""
+        },
+        {
+          "id": "query-api", "n": 3, "name": "The Query Mill", "desc": "REST + GraphQL surfaces",
+          "landmark": "mill", "status": "current", "progress": 0.4, "xp_reward": 25,
+          "plan": "atlas-query-api.md",
+          "next_step": "Add bbox filter to GraphQL resolver",
+          "why": "Without query API, the index isn't reachable by clients.",
+          "branch": "feat/query-api",
+          "tags": ["api", "geospatial"],
+          "kpi": "p95 query latency < 250ms",
+          "tasks": [
+            {"title": "Define schema", "done": true},
+            {"title": "REST endpoints", "done": true},
+            {"title": "GraphQL resolvers", "done": false},
+            {"title": "Pagination + cursor", "done": false},
+            {"title": "Auth integration", "done": false}
+          ]
+        },
+        {
+          "id": "client-sdk", "n": 4, "name": "The SDK Camp", "desc": "TypeScript + Python clients",
+          "landmark": "camp", "status": "locked", "progress": 0.0, "xp_reward": 25,
+          "plan": "atlas-client-sdk.md", "next_step": ""
+        }
+      ]
+    },
+    "nova": {
+      "name": "Nova",
+      "subtitle": "Real-time event pipeline",
+      "theme": "pokemon",
+      "level": 1,
+      "xp": {"current": 25, "max": 100},
+      "quests": [
+        {
+          "id": "ingest-v1", "n": 1, "name": "Ingest Town", "desc": "HTTP + gRPC event ingest",
+          "landmark": "house", "status": "done", "progress": 1.0, "xp_reward": 25,
+          "plan": "nova-ingest.md", "next_step": ""
+        },
+        {
+          "id": "kafka-bridge", "n": 2, "name": "Kafka Tower", "desc": "Stream events to Kafka topics",
+          "landmark": "tower", "status": "current", "progress": 0.5, "xp_reward": 25,
+          "plan": "nova-kafka.md",
+          "next_step": "Wire dead-letter queue + retry policy",
+          "branch": "feat/kafka-bridge",
+          "tags": ["streaming", "infra"],
+          "tasks": [
+            {"title": "Producer config", "done": true},
+            {"title": "Schema registry", "done": true},
+            {"title": "DLQ + retry", "done": false},
+            {"title": "Backpressure handling", "done": false}
+          ]
+        },
+        {
+          "id": "consumer-fanout", "n": 3, "name": "Fanout Mill", "desc": "Multi-consumer subscription model",
+          "landmark": "mill", "status": "locked", "progress": 0.0, "xp_reward": 25,
+          "plan": "nova-fanout.md", "next_step": ""
+        }
+      ]
+    }
+  }
+}

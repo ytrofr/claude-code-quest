@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{name}} — Quest {{active.n}}: {{active.name}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Fredoka', system-ui, sans-serif; background: #5db4d8; padding: 18px; color: #2a3a4a; }
+  .frame { max-width: 1280px; margin: 0 auto; background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 30px rgba(20,40,60,0.4); }
+  .head { padding: 14px 22px; background: linear-gradient(180deg, #fff 0%, #f7eed8 100%); border-bottom: 4px solid #2a3a4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .title { display: flex; align-items: center; gap: 12px; }
+  .badge { width: 50px; height: 50px; background: #ffd24a; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #2a3a4a; box-shadow: 0 3px 0 #c9a020; line-height: 1; }
+  h1 { margin: 0; font-weight: 700; font-size: 24px; color: #2a3a4a; line-height: 1.1; }
+  .sub { font-weight: 500; font-size: 13px; color: #6a7a8a; margin-top: 2px; }
+  .nav { display: flex; gap: 6px; margin: 0 8px; }
+  .nav a { padding: 8px 14px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; font-weight: 700; font-size: 12px; color: #2a3a4a; text-decoration: none; letter-spacing: 1px; text-transform: uppercase; }
+  .crumbs { padding: 12px 22px; background: #f7eed8; border-bottom: 3px solid #2a3a4a; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: #6a7a8a; }
+  .crumbs a { color: #2a3a4a; text-decoration: none; padding: 4px 10px; border: 2px solid #2a3a4a; border-radius: 8px; background: #fffdf2; font-weight: 700; }
+  .crumbs .here { padding: 4px 10px; background: #ff6a3a; color: #fff; border-radius: 8px; border: 2px solid #5a1818; font-weight: 700; }
+  .body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; }
+  .illus-cell { background: linear-gradient(180deg, #bbe4f5 0%, #bbe4f5 28%, #8fc97a 28%); border-right: 4px solid #2a3a4a; padding: 24px; min-height: 480px; }
+  .illus-cell svg { width: 100%; height: auto; display: block; }
+  .info-cell { padding: 24px 28px; background: #fffdf2; }
+  .quest-no { font-weight: 700; font-size: 13px; letter-spacing: 3px; color: #ff6a3a; text-transform: uppercase; margin-bottom: 4px; }
+  .quest-title { margin: 0; font-weight: 700; font-size: 32px; color: #5a1818; line-height: 1.1; letter-spacing: 0.3px; }
+  .stat-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .pill { padding: 6px 12px; background: #ffd24a; border: 2.5px solid #5a1818; border-radius: 14px; font-weight: 700; font-size: 12px; color: #5a1818; line-height: 1; }
+  .pill.type { background: #ff6a3a; color: #fff; }
+  .stats-block { margin-top: 22px; padding: 16px 18px; background: #f7eed8; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .stats-h { font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #2a3a4a; text-transform: uppercase; margin-bottom: 12px; }
+  .stat-line { display: grid; grid-template-columns: 88px 1fr 64px; gap: 10px; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+  .stat-line .barbg { height: 10px; background: #fffdf2; border: 2px solid #2a3a4a; border-radius: 6px; overflow: hidden; }
+  .stat-line .barfill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); }
+  .stat-line .v { text-align: right; font-weight: 700; }
+  .desc { margin-top: 22px; padding: 16px 18px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .desc-h { font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #6a7a8a; text-transform: uppercase; margin-bottom: 8px; }
+  .desc p { margin: 0 0 8px; font-size: 14px; line-height: 1.55; }
+  .next-step { margin-top: 18px; padding: 16px 18px; background: rgba(255,106,58,0.06); border: 3px solid #ff6a3a; border-radius: 12px; }
+  .next-step h3 { font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #5a1818; text-transform: uppercase; margin: 0 0 6px; }
+  .next-step p { margin: 0; font-size: 14px; font-weight: 600; color: #5a1818; line-height: 1.45; }
+  .actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .btn { padding: 10px 16px; border: 3px solid #2a3a4a; border-radius: 12px; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 4px 0 #2a3a4a; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+  .btn.primary { background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 4px 0 #5a1818; }
+  .btn.ghost { background: #fffdf2; color: #2a3a4a; }
+  .meta-line { margin-top: 18px; font-size: 12px; color: #6a7a8a; padding-top: 14px; border-top: 2px dashed #c0a878; }
+  code { font-family: ui-monospace, monospace; background: #f7eed8; padding: 2px 6px; border-radius: 4px; }
+  .twinkle { animation: tw 1.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes tw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
+
+  /* shared partial CSS — pokemon theme */
+  .qd-back-link { display: inline-block; padding: 6px 12px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; text-decoration: none; font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 3px 0 #2a3a4a; }
+  .qd-back-link:hover { transform: translateY(1px); box-shadow: 0 2px 0 #2a3a4a; }
+  .qd-tasks { margin-top: 18px; padding: 16px 18px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .qd-tasks-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .qd-tasks-title { margin: 0; font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #2a3a4a; text-transform: uppercase; }
+  .qd-tasks-count { font-weight: 700; font-size: 12px; color: #ff6a3a; }
+  .qd-tasks-list { list-style: none; padding: 0; margin: 0; }
+  .qd-task { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed rgba(42,58,74,0.15); }
+  .qd-task:last-child { border-bottom: none; }
+  .qd-task-mark { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a3a4a; border-radius: 4px; text-align: center; font-weight: 800; line-height: 14px; font-size: 12px; flex-shrink: 0; }
+  .qd-task-done .qd-task-mark { background: #5e9a4a; color: #fff; border-color: #2e5a2e; }
+  .qd-task-done .qd-task-title { color: #6a7a8a; text-decoration: line-through; }
+  .qd-task-todo .qd-task-mark { background: #fffdf2; color: transparent; }
+  .qd-task-title { font-weight: 600; color: #2a3a4a; }
+  .qd-meta { margin-top: 16px; padding: 14px 16px; background: #f7eed8; border: 3px solid #2a3a4a; border-radius: 12px; display: grid; gap: 6px; }
+  .qd-meta dt, .qd-meta dd { margin: 0; font-size: 12px; }
+  .qd-meta-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed rgba(42,58,74,0.15); }
+  .qd-meta-row:last-child { border-bottom: none; }
+  .qd-meta dt { font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: #6a7a8a; text-transform: uppercase; }
+  .qd-meta dd { font-weight: 600; color: #2a3a4a; word-break: break-word; }
+  .qd-meta code { font-family: ui-monospace, monospace; background: #fffdf2; padding: 2px 5px; border-radius: 4px; border: 1px solid #c0a878; font-size: 11px; font-weight: 600; }
+  .qd-progress { position: relative; height: 18px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; overflow: hidden; margin-top: 6px; }
+  .qd-progress-fill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); transition: width 0.3s ease; }
+  .qd-progress-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: #2a3a4a; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head">
+    <div class="title">
+      <div class="badge">{{level_roman}}</div>
+      <div>
+        <h1>{{name}} · Quest Detail</h1>
+        <div class="sub">{{subtitle}} · viewing Quest {{active.n}}</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="route.html">MAP</a>
+      <a href="quest-log.html">QUEST LOG</a>
+    </nav>
+  </header>
+
+  <div class="crumbs">
+    {{> _back-link}}
+    <span>›</span>
+    <a href="quest-log.html">Quest Log</a>
+    <span>›</span>
+    <span class="here">Quest {{active.n}} · {{active.name}}</span>
+  </div>
+
+  <div class="body">
+    <div class="illus-cell">
+      <svg viewBox="0 0 540 540" preserveAspectRatio="xMidYMid meet">
+        <rect x="0" y="0" width="540" height="180" fill="#bbe4f5"/>
+        <rect x="0" y="180" width="540" height="360" fill="#8fc97a"/>
+        <g fill="#fff" opacity="0.9">
+          <ellipse cx="100" cy="60" rx="46" ry="14"/><ellipse cx="120" cy="52" rx="34" ry="12"/>
+          <ellipse cx="420" cy="80" rx="50" ry="14"/>
+        </g>
+        <polygon points="0,200 80,100 160,200" fill="#7aa6c0"/>
+        <polygon points="380,200 460,90 540,200" fill="#7aa6c0"/>
+        <g fill="#5aa050" stroke="#3a7a3a" stroke-width="2"><ellipse cx="80" cy="450" rx="22" ry="10"/><ellipse cx="450" cy="460" rx="20" ry="9"/></g>
+        <g transform="translate(60,360)"><ellipse cx="0" cy="6" rx="20" ry="4" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="-12" width="6" height="14" fill="#6a4020"/><circle cx="0" cy="-22" r="22" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2.5"/></g>
+        <g transform="translate(490,380)"><ellipse cx="0" cy="6" rx="22" ry="4" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="-14" width="6" height="16" fill="#6a4020"/><circle cx="0" cy="-24" r="24" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2.5"/></g>
+        <path d="M 0 480 Q 100 460 200 440 Q 270 420 270 380" stroke="#5a4830" stroke-width="44" fill="none" stroke-linecap="round"/>
+        <path d="M 0 480 Q 100 460 200 440 Q 270 420 270 380" stroke="#efd9a3" stroke-width="34" fill="none" stroke-linecap="round"/>
+        <g transform="translate(270,300)" style="transform-origin:center;">
+          <g style="transform: scale(2.2); transform-origin: center;">{{{active.landmark_svg}}}</g>
+          <g class="twinkle" transform="translate(110, -50)">
+            <circle r="20" fill="#ffd24a" stroke="#5a1818" stroke-width="3.5"/>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-weight="900" font-size="26" font-family="Fredoka" fill="#5a1818">!</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="info-cell">
+      <div class="quest-no">▸ QUEST NO. {{active.n}} OF {{counts.total}} · ACTIVE</div>
+      <h2 class="quest-title">{{active.name}}</h2>
+      <div class="stat-row">
+        <span class="pill type">⚔ ACTIVE</span>
+        <span class="pill">+{{active.xp_reward}} XP</span>
+      </div>
+
+      <div class="stats-block">
+        <div class="stats-h">— Trainer Stats —</div>
+        <div class="stat-line">
+          <span>Progress</span>
+          <div class="barbg"><div class="barfill" style="width:{{active_progress_pct}}%"></div></div>
+          <span class="v">{{active_progress_pct}}%</span>
+        </div>
+        <div class="stat-line">
+          <span>Reward</span>
+          <div class="barbg"><div class="barfill" style="width:50%; background: #5e9a4a;"></div></div>
+          <span class="v">+{{active.xp_reward}}</span>
+        </div>
+        <div class="stat-line">
+          <span>Region</span>
+          <div class="barbg"><div class="barfill" style="width:{{xp_pct}}%; background: #ffd24a;"></div></div>
+          <span class="v">Lv {{level}}</span>
+        </div>
+      </div>
+
+      <div class="desc">
+        <div class="desc-h">— Quest Brief —</div>
+        <p>{{active.desc}}</p>
+      </div>
+
+      {{> _taskslist}}
+
+      {{> _meta-row}}
+
+      <div class="next-step">
+        <h3>▶ The Trainer's Next Move</h3>
+        <p>{{active.next_step}}</p>
+      </div>
+
+      <div class="actions">
+        <a class="btn primary" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> Resume Quest</a>
+        <a class="btn ghost" href="quest-log.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg> Back to Log</a>
+      </div>
+
+      <p class="meta-line">📜 Plan file: <code>~/.claude/plans/{{active.plan}}</code></p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
