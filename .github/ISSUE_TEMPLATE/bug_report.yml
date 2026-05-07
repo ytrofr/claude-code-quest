@@ -1,0 +1,66 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+title: "[bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Tight bug reports get fixed faster — please fill out the fields below.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: One sentence describing the bug.
+      placeholder: "The dashboard doesn't load — curl localhost:8770 returns 'Connection refused'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: "Dashboard should serve the global index page."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `./install.sh`
+        2. Open `http://localhost:8770/`
+        3. Browser shows connection refused
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output of `tail -50 ~/.claude/quest/logs/autosync.log` and/or `systemctl --user status quest-dashboard`
+      render: shell
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / shell
+      placeholder: "WSL2 Ubuntu 22.04 / zsh"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "Python 3.11.4"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Quest version (commit SHA)
+      placeholder: "Run: git -C ~/claude-code-quest rev-parse HEAD"

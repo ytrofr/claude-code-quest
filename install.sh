@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-code-gamify installer — one-shot bootstrap.
+# claude-code-quest installer — one-shot bootstrap.
 #
 # What it does:
 #   1. Copies skill source to ~/.claude/skills/quest/

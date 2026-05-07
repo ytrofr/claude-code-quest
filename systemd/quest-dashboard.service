@@ -1,6 +1,6 @@
 [Unit]
 Description=Quest Dashboard — static HTML server for ~/.claude/quest/site
-Documentation=https://github.com/ytrofr/claude-code-gamify
+Documentation=https://github.com/ytrofr/claude-code-quest
 After=network.target
 
 [Service]
