@@ -101,16 +101,29 @@ def detect_project(plan_path: Path) -> str | None:
     return None
 
 
+_BOX_LINE = re.compile(r"^([ \t>*-]*)\[([ xX])\]\s+(.+?)$", re.MULTILINE)
+_SUBBULLET = re.compile(r"^[ \t]+[-*+]\s+(.+?)$")
+
+
 def parse_plan_progress(plan_text: str) -> dict:
     """Extract tasks + progress from plan markdown.
 
-    Strategy:
-      1. If Section 13 (post-validation) exists, parse only its checkboxes —
-         the canonical "is the plan done?" signal per plan-checklist invariants.
-      2. Otherwise fall back to all checkboxes in the plan body.
-      3. Empty result is fine — caller decides what to do (don't overwrite).
+    Each task may have problem/solution from sub-bullets directly under it:
+      - [x] Task title
+        - Problem: short problem statement
+        - Solution: short fix approach
 
-    Returns: {tasks: [{title, done}], progress: float|None, source: str}
+    Strategy:
+      1. If Section 13 exists, parse only its checkboxes (canonical signal).
+      2. Otherwise fall back to all checkboxes in the plan body.
+      3. For each box, scan SUBSEQUENT lines:
+         - sub-bullet starting "Problem:" → task.problem
+         - sub-bullet starting "Solution:" → task.solution
+         - other sub-bullet → task.brief (first one only)
+         - non-sub-bullet line → end of this task's brief block
+
+    Returns: {tasks: [{title, done, problem?, solution?, brief?}],
+              progress: float|None, source: str}
     """
     if not plan_text:
         return {"tasks": [], "progress": None, "source": "empty"}
@@ -122,23 +135,55 @@ def parse_plan_progress(plan_text: str) -> dict:
     target = sec13.group(0) if sec13 else plan_text
     source = "section_13" if sec13 else "fallback_all"
 
-    # Match `- [ ]` / `- [x]` in markdown lists (allows tabs, indent, > prefix)
-    boxes = re.findall(
-        r"^[\s>*-]*\[([ xX])\]\s+(.+?)$",
-        target, re.MULTILINE,
-    )
-    if not boxes:
+    # Walk the lines, collecting boxes + their sub-bullets. We split on \n so
+    # we can look ahead per task (regex match-only loses the structure).
+    lines = target.split("\n")
+    tasks: list[dict] = []
+    current: dict | None = None
+
+    def _flush() -> None:
+        nonlocal current
+        if current is not None:
+            tasks.append(current)
+            current = None
+
+    for line in lines:
+        m = _BOX_LINE.match(line)
+        if m:
+            _flush()
+            mark = m.group(2).lower()
+            title = m.group(3).strip()
+            title = re.sub(r"\s+`[^`]*`\s*$", "", title)
+            current = {"title": title[:120], "done": mark == "x"}
+            continue
+
+        if current is None:
+            continue
+
+        sub = _SUBBULLET.match(line)
+        if sub:
+            text = sub.group(1).strip()[:200]
+            low = text.lower()
+            if low.startswith("problem:") or low.startswith("problem —") or low.startswith("problem -"):
+                current["problem"] = text.split(":", 1)[1].strip() if ":" in text else text[8:].strip()
+            elif low.startswith("solution:") or low.startswith("solution —") or low.startswith("solution -"):
+                current["solution"] = text.split(":", 1)[1].strip() if ":" in text else text[9:].strip()
+            elif "brief" not in current:
+                current["brief"] = text
+            continue
+
+        # Blank line keeps us "inside" the task; non-blank non-sub-bullet ends it
+        if line.strip() == "":
+            continue
+        _flush()
+
+    _flush()
+
+    if not tasks:
         return {"tasks": [], "progress": None, "source": source + "_no_boxes"}
 
-    tasks = []
-    for mark, title in boxes:
-        clean = title.strip()
-        # Strip trailing markdown emphasis / code spans
-        clean = re.sub(r"\s+`[^`]*`\s*$", "", clean)
-        tasks.append({"title": clean[:120], "done": mark.lower() == "x"})
-
     done = sum(1 for t in tasks if t["done"])
-    progress = round(done / len(tasks), 3) if tasks else None
+    progress = round(done / len(tasks), 3)
     return {"tasks": tasks, "progress": progress, "source": source}
 
 

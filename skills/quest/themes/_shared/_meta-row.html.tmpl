@@ -1,41 +1,18 @@
 <!-- Partial: _meta-row
-     Scope keys used: branch, last_commit.{sha,msg,date}, last_touched_human, why, blockers, tags, kpi
-     All fields optional — partial renders only the rows that resolve. -->
+     Scope keys used: last_commit.{sha,msg,date}, last_touched_human, blockers_str
+     All fields optional — partial renders only the rows that resolve.
+     Note: why moved into quest brief; branch/kpi/tags moved to .qd-pills near title. -->
 <dl class="qd-meta">
-  {{#if why}}
-  <div class="qd-meta-row qd-meta-why">
-    <dt>Why</dt>
-    <dd>{{why}}</dd>
-  </div>
-  {{/if}}
-  {{#if branch}}
-  <div class="qd-meta-row qd-meta-branch">
-    <dt>Branch</dt>
-    <dd><code>{{branch}}</code></dd>
-  </div>
-  {{/if}}
-  {{#if last_commit.sha}}
-  <div class="qd-meta-row qd-meta-commit">
-    <dt>Last commit</dt>
-    <dd><code>{{last_commit.sha}}</code> — {{last_commit.msg}}</dd>
-  </div>
-  {{/if}}
   {{#if last_touched_human}}
   <div class="qd-meta-row qd-meta-touched">
     <dt>Last touched</dt>
     <dd>{{last_touched_human}}</dd>
   </div>
   {{/if}}
-  {{#if kpi}}
-  <div class="qd-meta-row qd-meta-kpi">
-    <dt>KPI</dt>
-    <dd><code>{{kpi}}</code></dd>
-  </div>
-  {{/if}}
-  {{#if tags_str}}
-  <div class="qd-meta-row qd-meta-tags">
-    <dt>Tags</dt>
-    <dd>{{tags_str}}</dd>
+  {{#if last_commit.sha}}
+  <div class="qd-meta-row qd-meta-commit">
+    <dt>Last commit</dt>
+    <dd><code>{{last_commit.sha}}</code> — {{last_commit.msg}}</dd>
   </div>
   {{/if}}
   {{#if blockers_str}}

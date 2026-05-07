@@ -51,18 +51,44 @@
   /* shared partial CSS — pokemon theme */
   .qd-back-link { display: inline-block; padding: 6px 12px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; text-decoration: none; font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 3px 0 #2a3a4a; }
   .qd-back-link:hover { transform: translateY(1px); box-shadow: 0 2px 0 #2a3a4a; }
+  .qd-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+  .qd-pill { padding: 4px 10px; font-size: 11px; font-weight: 600; color: #2a3a4a; background: #fffdf2; border: 2px solid #2a3a4a; border-radius: 12px; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .qd-pill-branch { background: #d8eaf5; }
+  .qd-pill-kpi { background: #fff0c8; }
+  .qd-pill-tags { background: #ffe0d0; }
+  .qd-why { margin: 10px 0 0; padding: 10px 14px; background: rgba(255,106,58,0.08); border-left: 3px solid #ff6a3a; font-size: 13px; font-style: italic; color: #5a3a2a; line-height: 1.5; }
+  .qd-why-mark { color: #ff6a3a; font-style: normal; margin-right: 6px; }
   .qd-tasks { margin-top: 18px; padding: 16px 18px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; }
   .qd-tasks-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .qd-tasks-title { margin: 0; font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #2a3a4a; text-transform: uppercase; }
   .qd-tasks-count { font-weight: 700; font-size: 12px; color: #ff6a3a; }
   .qd-tasks-list { list-style: none; padding: 0; margin: 0; }
-  .qd-task { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed rgba(42,58,74,0.15); }
+  .qd-task { padding: 6px 0; font-size: 13px; border-bottom: 1px dashed rgba(42,58,74,0.15); }
   .qd-task:last-child { border-bottom: none; }
+  .qd-task > span { display: inline-flex; align-items: flex-start; gap: 8px; }
+  .qd-task-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; padding: 2px 0; }
+  .qd-task-summary::-webkit-details-marker { display: none; }
   .qd-task-mark { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a3a4a; border-radius: 4px; text-align: center; font-weight: 800; line-height: 14px; font-size: 12px; flex-shrink: 0; }
   .qd-task-done .qd-task-mark { background: #5e9a4a; color: #fff; border-color: #2e5a2e; }
   .qd-task-done .qd-task-title { color: #6a7a8a; text-decoration: line-through; }
   .qd-task-todo .qd-task-mark { background: #fffdf2; color: transparent; }
-  .qd-task-title { font-weight: 600; color: #2a3a4a; }
+  .qd-task-title { font-weight: 600; color: #2a3a4a; flex: 1; }
+  .qd-task-arrow { color: #ff6a3a; font-size: 12px; transition: transform 0.2s ease; opacity: 0.7; }
+  .qd-task-details[open] .qd-task-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-task-brief { margin: 6px 0 6px 26px; padding: 10px 12px; background: #f7eed8; border-radius: 8px; border: 2px solid #c0a878; font-size: 12px; }
+  .qd-brief-line { margin: 0 0 4px; line-height: 1.5; color: #2a3a4a; }
+  .qd-brief-line:last-child { margin-bottom: 0; }
+  .qd-brief-line strong { color: #5a1818; font-weight: 700; }
+  .qd-brief-arrow { padding-left: 14px; position: relative; }
+  .qd-brief-arrow::before { content: '→'; position: absolute; left: 0; color: #ff6a3a; font-weight: 800; }
+  .qd-next { margin-top: 18px; padding: 14px 18px; background: rgba(255,106,58,0.06); border: 3px solid #ff6a3a; border-radius: 12px; }
+  .qd-next-title { margin: 0 0 8px; font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #5a1818; text-transform: uppercase; }
+  .qd-next-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+  .qd-next-summary::-webkit-details-marker { display: none; }
+  .qd-next-text { font-weight: 600; color: #5a1818; font-size: 14px; flex: 1; }
+  .qd-next-arrow { color: #ff6a3a; font-size: 14px; transition: transform 0.2s ease; }
+  .qd-next-details[open] .qd-next-arrow { transform: rotate(90deg); }
+  .qd-next-brief { margin: 8px 0 0 22px; padding: 10px 12px; background: #fffdf2; border-radius: 8px; border: 2px solid #c0a878; font-size: 12px; }
   .qd-meta { margin-top: 16px; padding: 14px 16px; background: #f7eed8; border: 3px solid #2a3a4a; border-radius: 12px; display: grid; gap: 6px; }
   .qd-meta dt, .qd-meta dd { margin: 0; font-size: 12px; }
   .qd-meta-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed rgba(42,58,74,0.15); }
@@ -132,6 +158,7 @@
         <span class="pill type">⚔ ACTIVE</span>
         <span class="pill">+{{active.xp_reward}} XP</span>
       </div>
+      {{> _pills}}
 
       <div class="stats-block">
         <div class="stats-h">— Trainer Stats —</div>
@@ -155,16 +182,14 @@
       <div class="desc">
         <div class="desc-h">— Quest Brief —</div>
         <p>{{active.desc}}</p>
+        {{> _why}}
       </div>
 
       {{> _taskslist}}
 
-      {{> _meta-row}}
+      {{> _next-step}}
 
-      <div class="next-step">
-        <h3>▶ The Trainer's Next Move</h3>
-        <p>{{active.next_step}}</p>
-      </div>
+      {{> _meta-row}}
 
       <div class="actions">
         <a class="btn primary" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> Resume Quest</a>
