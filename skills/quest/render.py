@@ -343,14 +343,14 @@ def render_global_index(data: dict) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Quest Dashboard</title>
 <style>
-body {{ font: 16px/1.5 system-ui, sans-serif; background: #faf3df; color: #3a2010; padding: 32px; }}
-h1 {{ font-size: 28px; margin: 0 0 8px; }}
+body {{ font: 17.6px/1.5 system-ui, sans-serif; background: #faf3df; color: #3a2010; padding: 32px; }}
+h1 {{ font-size: 30.8px; margin: 0 0 8px; }}
 .sub {{ color: #6a4828; margin-bottom: 24px; }}
 ul {{ list-style: none; padding: 0; }}
 li {{ padding: 14px 18px; background: #fff; border: 2px solid #3a2010; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 3px 0 #3a2010; }}
 a {{ color: #c44a2a; text-decoration: none; }}
 a:hover {{ text-decoration: underline; }}
-.theme {{ font-size: 12px; padding: 2px 8px; background: #ffd9b8; border-radius: 10px; }}
+.theme {{ font-size: 13.2px; padding: 2px 8px; background: #ffd9b8; border-radius: 10px; }}
 </style></head>
 <body>
 <h1>Quest Dashboard</h1>
