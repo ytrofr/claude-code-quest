@@ -1,0 +1,23 @@
+<!-- Partial: _next-step
+     Scope keys used: active.next_step, active.next_step_problem, active.next_step_solution
+     If next_step has problem context, becomes clickable <details>. Else plain block. -->
+{{#if active.next_step}}
+<section class="qd-next" data-qd="next">
+  <h3 class="qd-next-title">Next Move</h3>
+  {{#if active.next_step_problem}}
+  <details class="qd-next-details">
+    <summary class="qd-next-summary">
+      <span class="qd-next-arrow" aria-hidden="true">▸</span>
+      <span class="qd-next-text">{{active.next_step}}</span>
+    </summary>
+    <div class="qd-next-brief">
+      <p class="qd-brief-line"><strong>Problem:</strong> {{active.next_step_problem}}</p>
+      {{#if active.next_step_solution}}<p class="qd-brief-line qd-brief-arrow"><strong>Solution:</strong> {{active.next_step_solution}}</p>{{/if}}
+    </div>
+  </details>
+  {{/if}}
+  {{#if active.no_next_brief}}
+  <p class="qd-next-text">{{active.next_step}}</p>
+  {{/if}}
+</section>
+{{/if}}

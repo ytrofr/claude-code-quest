@@ -143,6 +143,12 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
             for t in tasks:
                 t["done_class"] = "done" if t.get("done") else "todo"
                 t["done_mark"] = "✓" if t.get("done") else "○"
+                # Click-to-expand markers — needs explicit truthy field per
+                # {{#if}} (no {{#unless}}). Brief = problem OR solution OR plain brief.
+                if t.get("problem") or t.get("solution") or t.get("brief"):
+                    t["has_brief"] = True
+                else:
+                    t["no_brief"] = True
             q["tasks_done"] = sum(1 for t in tasks if t.get("done"))
             q["tasks_total"] = len(tasks)
         # Human-readable last-touched timestamp
@@ -153,6 +159,9 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
             q["blockers_str"] = ", ".join(q["blockers"])
         if q.get("tags"):
             q["tags_str"] = ", ".join(q["tags"])
+        # Next-step expandable marker
+        if q.get("next_step") and not q.get("next_step_problem"):
+            q["no_next_brief"] = True
 
     # Hoist active quest's v2 fields onto project scope so plan-card partials
     # (which run at project scope) can reference {{tasks}}, {{branch}}, etc.
@@ -174,7 +183,9 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
 _TRIPLE = re.compile(r"\{\{\{([^{}]+?)\}\}\}")
 _DOUBLE = re.compile(r"\{\{([^#/>{}][^{}]*?)\}\}")
 _EACH = re.compile(r"\{\{#each\s+([\w.]+)\}\}(.*?)\{\{/each\}\}", re.DOTALL)
-_IF = re.compile(r"\{\{#if\s+([\w.]+)\}\}(.*?)\{\{/if\}\}", re.DOTALL)
+# Tempered-token body excludes nested {{#if so inner ifs match first.
+# The while-loop in _expand_if then peels outer layers.
+_IF = re.compile(r"\{\{#if\s+([\w.]+)\}\}((?:(?!\{\{#if\s).)*?)\{\{/if\}\}", re.DOTALL)
 _PARTIAL = re.compile(r"\{\{>\s*([\w.-]+)\s*\}\}")
 
 

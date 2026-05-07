@@ -1,0 +1,9 @@
+<!-- Partial: _pills
+     Scope keys used: branch, kpi, tags_str
+     Renders compact inline pills near the title. Each pill independent. -->
+{{#if branch}}{{#if kpi}}{{#if tags_str}}{{/if}}{{/if}}{{/if}}
+<div class="qd-pills">
+  {{#if branch}}<span class="qd-pill qd-pill-branch" title="Git branch">⎇ {{branch}}</span>{{/if}}
+  {{#if kpi}}<span class="qd-pill qd-pill-kpi" title="KPI target">📊 {{kpi}}</span>{{/if}}
+  {{#if tags_str}}<span class="qd-pill qd-pill-tags" title="Tags">🏷 {{tags_str}}</span>{{/if}}
+</div>

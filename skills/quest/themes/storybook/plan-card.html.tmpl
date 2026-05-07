@@ -55,18 +55,44 @@
   /* shared partial CSS — storybook theme */
   .qd-back-link { display: inline-block; padding: 4px 10px; background: #fbf3df; border: 2px solid #4a2e1a; color: #4a2e1a; text-decoration: none; font-family: 'Eczar', serif; font-weight: 700; font-style: normal; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
   .qd-back-link:hover { background: #f3e6c4; }
+  .qd-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; font-family: 'Eczar', serif; }
+  .qd-pill { padding: 3px 10px; font-size: 11px; font-weight: 700; color: #4a2e1a; background: #fbf3df; border: 1.5px solid #4a2e1a; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
+  .qd-pill-branch { background: #ede0c0; }
+  .qd-pill-kpi { background: #f0c050; }
+  .qd-pill-tags { background: #f3e6c4; font-style: italic; font-weight: 600; }
+  .qd-why { margin: 12px 0 0; padding: 10px 14px; background: rgba(196,74,42,0.07); border-left: 3px solid #c44a2a; font-family: 'Eczar', serif; font-size: 14px; font-style: italic; color: #4a2e1a; line-height: 1.5; }
+  .qd-why-mark { color: #c44a2a; font-style: normal; margin-right: 6px; }
   .qd-tasks { margin-top: 18px; padding: 16px 20px; background: rgba(196,74,42,0.05); border: 2px solid #c44a2a; }
   .qd-tasks-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .qd-tasks-title { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; }
   .qd-tasks-count { font-family: 'Eczar', serif; font-weight: 700; font-size: 13px; color: #c44a2a; }
   .qd-tasks-list { list-style: none; padding: 0; margin: 0; }
-  .qd-task { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-family: 'Eczar', serif; font-size: 14px; border-bottom: 1px dotted rgba(138,111,74,0.3); }
+  .qd-task { padding: 6px 0; font-family: 'Eczar', serif; font-size: 14px; border-bottom: 1px dotted rgba(138,111,74,0.3); }
   .qd-task:last-child { border-bottom: none; }
+  .qd-task > span { display: inline-flex; align-items: flex-start; gap: 10px; }
+  .qd-task-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; padding: 2px 0; }
+  .qd-task-summary::-webkit-details-marker { display: none; }
   .qd-task-mark { display: inline-block; width: 18px; height: 18px; border: 1.5px solid #4a2e1a; text-align: center; font-weight: 700; line-height: 15px; font-size: 12px; flex-shrink: 0; background: #fbf3df; }
   .qd-task-done .qd-task-mark { background: #c44a2a; color: #fbf3df; border-color: #4a2e1a; }
   .qd-task-done .qd-task-title { color: #7a5a3a; text-decoration: line-through; font-style: italic; }
   .qd-task-todo .qd-task-mark { color: transparent; }
-  .qd-task-title { color: #2a1f15; }
+  .qd-task-title { color: #2a1f15; flex: 1; }
+  .qd-task-arrow { color: #c44a2a; font-size: 12px; transition: transform 0.2s ease; opacity: 0.7; }
+  .qd-task-details[open] .qd-task-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-task-brief { margin: 6px 0 6px 28px; padding: 10px 12px; background: #fbf3df; border: 1px solid #c89030; font-family: 'Eczar', serif; font-size: 13px; line-height: 1.55; }
+  .qd-brief-line { margin: 0 0 4px; color: #2a1f15; }
+  .qd-brief-line:last-child { margin-bottom: 0; }
+  .qd-brief-line strong { color: #c44a2a; font-weight: 700; font-style: normal; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+  .qd-brief-arrow { padding-left: 14px; position: relative; }
+  .qd-brief-arrow::before { content: '→'; position: absolute; left: 0; color: #c44a2a; font-weight: 800; }
+  .qd-next { margin-top: 18px; padding: 14px 18px; background: rgba(196,74,42,0.05); border: 2px solid #c44a2a; }
+  .qd-next-title { margin: 0 0 8px; font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; }
+  .qd-next-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+  .qd-next-summary::-webkit-details-marker { display: none; }
+  .qd-next-text { font-family: 'Eczar', serif; font-weight: 700; color: #4a2e1a; font-size: 16px; flex: 1; line-height: 1.4; }
+  .qd-next-arrow { color: #c44a2a; font-size: 14px; transition: transform 0.2s ease; }
+  .qd-next-details[open] .qd-next-arrow { transform: rotate(90deg); }
+  .qd-next-brief { margin: 8px 0 0 24px; padding: 10px 12px; background: #fbf3df; border: 1px solid #c89030; font-family: 'Eczar', serif; font-size: 13px; line-height: 1.55; }
   .qd-meta { margin-top: 16px; padding: 14px 18px; background: #f3e6c4; border: 2px solid #8a6f4a; display: grid; gap: 4px; }
   .qd-meta-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px dotted rgba(138,111,74,0.3); font-family: 'Eczar', serif; }
   .qd-meta-row:last-child { border-bottom: none; }
@@ -142,6 +168,8 @@
       <div class="chapter-mark">— Chapter the {{active.n}} —</div>
       <h2>{{active.name}}</h2>
       <p class="epigraph">{{active.desc}}</p>
+      {{> _why}}
+      {{> _pills}}
       <div class="ornament">❦ ⁂ ❦</div>
 
       <div class="narrative">
@@ -152,12 +180,9 @@
 
       {{> _taskslist}}
 
-      {{> _meta-row}}
+      {{> _next-step}}
 
-      <div class="deeds">
-        <div class="h">— The Operator's Deeds —</div>
-        <div class="deed">▶ {{active.next_step}}</div>
-      </div>
+      {{> _meta-row}}
 
       <p class="margin">📜 Charter: <code>~/.claude/plans/{{active.plan}}</code></p>
 
