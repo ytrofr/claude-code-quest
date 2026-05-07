@@ -1,0 +1,21 @@
+[Unit]
+Description=Quest Dashboard — static HTML server for ~/.claude/quest/site
+Documentation=https://github.com/ytrofr/claude-code-gamify
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m http.server 8770 --directory %h/.claude/quest/site --bind 127.0.0.1
+Restart=on-failure
+RestartSec=5s
+# Re-render before starting in case data changed since last render (best-effort, non-blocking)
+ExecStartPre=-/usr/bin/python3 %h/.claude/skills/quest/render.py
+
+# Hardening — port-bound to localhost only via --bind 127.0.0.1 above
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/.claude/quest
+
+[Install]
+WantedBy=default.target

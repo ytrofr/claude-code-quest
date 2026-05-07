@@ -1,0 +1,16 @@
+{
+  "name": "pokemon",
+  "version": 1,
+  "description": "Top-down regional map. Bright grass, sandy paths, cute houses, trainer pawn at current location. Fredoka font.",
+  "font": "Fredoka",
+  "landmarks": ["house", "tower", "mill", "bridge", "camp", "cave", "castle"],
+  "positions": {
+    "1": "translate(90,460)",
+    "2": "translate(280,380)",
+    "3": "translate(460,320)",
+    "4": "translate(640,290)",
+    "5": "translate(830,260)",
+    "6": "translate(1090,130)",
+    "7": "translate(1140,75)"
+  }
+}

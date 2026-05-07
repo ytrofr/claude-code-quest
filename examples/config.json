@@ -1,0 +1,8 @@
+{
+  "_doc": "Path map: tells the autosync hook which project a plan file belongs to. Order matters — list more-specific paths FIRST. Drop this at ~/.claude/quest/config.json after editing for your machine.",
+  "path_map": [
+    {"path": "/absolute/path/to/your/first-project", "id": "apollo"},
+    {"path": "/absolute/path/to/your/second-project", "id": "atlas"},
+    {"path": "/absolute/path/to/your/third-project", "id": "nova"}
+  ]
+}

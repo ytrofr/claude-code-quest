@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{name}} — Storybook Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Eczar:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Quicksand', system-ui, sans-serif; background: #c8a672; padding: 18px; color: #4a2e1a; }
+  .frame { max-width: 1280px; margin: 0 auto; background: #fbf3df; border: 6px double #8a6f4a; border-radius: 12px; overflow: hidden; box-shadow: 0 12px 36px rgba(60,40,20,0.4); position: relative; }
+  .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(138,111,74,0.4); pointer-events: none; border-radius: 6px; z-index: 1; }
+  .head { padding: 16px 28px; background: linear-gradient(180deg, #fbf3df 0%, #f3e6c4 100%); border-bottom: 2px dashed #8a6f4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; position: relative; z-index: 2; }
+  .title-row { display: flex; align-items: center; gap: 14px; }
+  .crest { width: 56px; height: 56px; }
+  h1 { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 28px; color: #4a2e1a; line-height: 1.1; }
+  .sub { font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; margin-top: 2px; }
+  .nav { display: flex; gap: 6px; margin: 0 8px; align-items: center; }
+  .nav a { padding: 8px 14px; background: #fbf3df; border: 2.5px solid #4a2e1a; font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; color: #4a2e1a; text-decoration: none; letter-spacing: 1.5px; text-transform: uppercase; }
+  .nav a.active { background: #4a2e1a; color: #fbf3df; }
+  .qd-back-link { padding: 4px 10px; background: #c89030; border: 2px solid #4a2e1a; color: #4a2e1a; text-decoration: none; font-family: 'Eczar', serif; font-weight: 700; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .qd-back-link:hover { background: #d8a040; }
+  .xp-block { display: flex; align-items: center; gap: 12px; }
+  .xp-label { font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; color: #4a2e1a; letter-spacing: 2px; text-transform: uppercase; }
+  .xp-bar { width: 200px; height: 16px; background: #ede0c0; border: 2px solid #4a2e1a; border-radius: 10px; overflow: hidden; position: relative; }
+  .xp-fill { height: 100%; background: linear-gradient(180deg, #f0c050 0%, #c89030 100%); }
+  .xp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: #4a2e1a; }
+  .map-wrap { position: relative; }
+  .map { width: 100%; display: block; }
+  .footer { padding: 16px 28px; background: linear-gradient(180deg, #f3e6c4 0%, #fbf3df 100%); border-top: 2px dashed #8a6f4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; position: relative; z-index: 2; }
+  .now { display: flex; align-items: center; gap: 12px; }
+  .now-tag { padding: 5px 12px; background: #c44a2a; color: #fbf3df; font-weight: 700; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 4px; }
+  .now-name { font-family: 'Eczar', serif; font-weight: 700; font-size: 19px; color: #4a2e1a; }
+  .progress-pill { display: flex; align-items: center; gap: 10px; }
+  .progress-pill .bar { width: 160px; height: 12px; background: #ede0c0; border: 2px solid #4a2e1a; border-radius: 8px; overflow: hidden; }
+  .progress-pill .fill { height: 100%; background: linear-gradient(180deg, #e07050 0%, #c44a2a 100%); }
+  .progress-pill .pct { font-family: 'Eczar', serif; font-weight: 700; font-size: 16px; color: #4a2e1a; }
+  /* Quest marker visibility */
+  .qm-locked { opacity: 0.66; }
+  .badge-done, .badge-current { display: none; }
+  .qm-done .badge-done { display: block; }
+  .qm-current .badge-current { display: block; }
+  .float { animation: float 3.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .twinkle { animation: tw 2s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes tw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.85; } }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head">
+    <div class="title-row">
+      <svg class="crest" viewBox="0 0 56 56">
+        <path d="M 28 4 L 50 14 V 30 Q 50 46 28 52 Q 6 46 6 30 V 14 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2.5"/>
+        <path d="M 28 12 L 42 18 V 30 Q 42 40 28 44 Q 14 40 14 30 V 18 Z" fill="#c89030" stroke="#4a2e1a" stroke-width="1.5"/>
+        <text x="28" y="32" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="16" fill="#fbf3df">{{level_roman}}</text>
+      </svg>
+      <div>
+        <h1>The Tale of {{name}}</h1>
+        <div class="sub">{{subtitle}} · {{counts.total}} chapters</div>
+      </div>
+    </div>
+    <nav class="nav">
+      {{> _back-link}}
+      <a href="route.html" class="active">MAP</a>
+      <a href="quest-log.html">CHAPTERS</a>
+    </nav>
+    <div class="xp-block">
+      <span class="xp-label">Heart</span>
+      <div class="xp-bar"><div class="xp-fill" style="width:{{xp_pct}}%"></div><div class="xp-text">{{xp.current}} / {{xp.max}}</div></div>
+    </div>
+  </header>
+
+  <div class="map-wrap">
+    <svg class="map" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="sky-grad" cx="50%" cy="20%"><stop offset="0%" stop-color="#fbe8c4"/><stop offset="100%" stop-color="#e8d4a0"/></radialGradient>
+        <linearGradient id="forest-grad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#7ea870"/><stop offset="100%" stop-color="#4a7848"/></linearGradient>
+        <radialGradient id="mtn-grad" cx="50%" cy="20%"><stop offset="0%" stop-color="#c8b09a"/><stop offset="100%" stop-color="#7a5a40"/></radialGradient>
+      </defs>
+
+      <rect width="1200" height="540" fill="url(#sky-grad)"/>
+      <ellipse cx="200" cy="100" rx="60" ry="20" fill="#c8a878" opacity="0.15"/>
+      <ellipse cx="900" cy="400" rx="80" ry="30" fill="#c8a878" opacity="0.12"/>
+
+      <g stroke="#a89060" stroke-width="1.4" fill="none" opacity="0.5">
+        <path d="M 120 90 q 20 -10 40 0 q 20 -10 40 0 q 20 -10 40 0"/>
+        <path d="M 800 70 q 16 -8 32 0 q 16 -8 32 0"/>
+      </g>
+
+      <ellipse cx="220" cy="380" rx="160" ry="70" fill="#8eb878" opacity="0.55"/>
+      <ellipse cx="900" cy="180" rx="200" ry="100" fill="#c8b08a" opacity="0.4"/>
+      <ellipse cx="600" cy="430" rx="120" ry="40" fill="#8ec4d8" opacity="0.55"/>
+
+      <g>
+        <polygon points="820,250 880,140 940,250" fill="url(#mtn-grad)" stroke="#5a4028" stroke-width="2"/>
+        <polygon points="900,260 950,150 1000,260" fill="url(#mtn-grad)" stroke="#5a4028" stroke-width="2"/>
+      </g>
+
+      <g transform="translate(160,400)" class="float">
+        <ellipse cx="0" cy="6" rx="20" ry="4" fill="#4a3a20" opacity="0.4"/>
+        <rect x="-5" y="-12" width="10" height="18" fill="#6a4824" stroke="#4a3018" stroke-width="2"/>
+        <path d="M 0 -50 Q -28 -30 -22 -10 Q -28 5 0 0 Q 28 5 22 -10 Q 28 -30 0 -50 Z" fill="url(#forest-grad)" stroke="#2a5a2a" stroke-width="2.5"/>
+      </g>
+      <g transform="translate(280,420)">
+        <ellipse cx="0" cy="6" rx="22" ry="4" fill="#4a3a20" opacity="0.4"/>
+        <rect x="-6" y="-12" width="12" height="18" fill="#6a4824" stroke="#4a3018" stroke-width="2"/>
+        <path d="M 0 -54 Q -32 -32 -26 -10 Q -32 5 0 0 Q 32 5 26 -10 Q 32 -32 0 -54 Z" fill="url(#forest-grad)" stroke="#2a5a2a" stroke-width="2.5"/>
+      </g>
+
+      <g stroke="#fff" stroke-width="1.5" fill="none" opacity="0.7">
+        <path d="M 540 425 q 10 -3 20 0 t 20 0"/>
+        <path d="M 580 440 q 10 -3 20 0 t 20 0"/>
+      </g>
+
+      <path d="M 80 460 Q 200 430 280 380 Q 360 340 460 320 Q 560 300 640 320 Q 720 340 820 280 Q 880 240 940 180 Q 1000 120 1060 90" stroke="#8a4828" stroke-width="3" fill="none" stroke-dasharray="4 8" stroke-linecap="round"/>
+
+      <!-- ===== QUEST MARKERS ===== -->
+      {{#each quests}}
+      <g transform="{{q.transform}}" class="qm qm-{{q.status_class}}" data-quest="{{q.id}}">
+        {{{q.landmark_svg}}}
+
+        <g class="badge-done">
+          <circle cx="22" cy="-22" r="11" fill="#5e9a4a" stroke="#fbf3df" stroke-width="2.5"/>
+          <path d="M 17 -22 l 4 4 l 7 -8" stroke="#fbf3df" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+
+        <g class="badge-current twinkle">
+          <circle r="58" fill="#ffd97a" opacity="0.32"/>
+        </g>
+
+        <path d="M -52 50 L 52 50 L 46 64 L -46 64 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2"/>
+        <text x="0" y="60" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="11" fill="#4a2e1a">{{q.roman}} · {{q.name}}</text>
+      </g>
+      {{/each}}
+
+      <!-- Compass -->
+      <g transform="translate(80, 80)">
+        <circle r="32" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2"/>
+        <polygon points="0,-26 5,0 0,26 -5,0" fill="#c44a2a" stroke="#4a2e1a" stroke-width="1.5"/>
+        <polygon points="-26,0 0,-3 26,0 0,3" fill="#4a2e1a"/>
+        <text x="0" y="-36" text-anchor="middle" font-family="Eczar" font-weight="700" font-size="11" fill="#4a2e1a">N</text>
+      </g>
+    </svg>
+  </div>
+
+  <footer class="footer">
+    <div class="now">
+      <span class="now-tag">Chapter {{active.n}}</span>
+      <span class="now-name">{{active.name}}</span>
+    </div>
+    <div class="progress-pill">
+      <div class="bar"><div class="fill" style="width:{{active_progress_pct}}%"></div></div>
+      <span class="pct">{{active_progress_pct}}%</span>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

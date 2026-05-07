@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{name}} — Chapter {{active.n}}: {{active.name}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Eczar:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Quicksand', system-ui, sans-serif; background: #c8a672; padding: 18px; color: #4a2e1a; }
+  .frame { max-width: 1280px; margin: 0 auto; background: #fbf3df; border: 6px double #8a6f4a; border-radius: 12px; overflow: hidden; box-shadow: 0 12px 36px rgba(60,40,20,0.4); position: relative; }
+  .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(138,111,74,0.4); pointer-events: none; border-radius: 6px; z-index: 1; }
+  .head { padding: 16px 28px; background: linear-gradient(180deg, #fbf3df 0%, #f3e6c4 100%); border-bottom: 2px dashed #8a6f4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; position: relative; z-index: 2; }
+  .title-row { display: flex; align-items: center; gap: 14px; }
+  .crest { width: 56px; height: 56px; }
+  h1 { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 26px; color: #4a2e1a; line-height: 1.1; }
+  .sub { font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; margin-top: 2px; }
+  .nav { display: flex; gap: 6px; margin: 0 8px; }
+  .nav a { padding: 8px 14px; background: #fbf3df; border: 2.5px solid #4a2e1a; font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; color: #4a2e1a; text-decoration: none; letter-spacing: 1.5px; text-transform: uppercase; }
+  .crumbs { padding: 12px 28px; background: #f3e6c4; border-bottom: 2px dashed #8a6f4a; display: flex; align-items: center; gap: 8px; font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; position: relative; z-index: 2; }
+  .crumbs a { color: #4a2e1a; text-decoration: none; padding: 4px 10px; border: 2px solid #4a2e1a; background: #fbf3df; font-weight: 700; font-style: normal; }
+  .crumbs .here { padding: 4px 10px; background: #c44a2a; color: #fbf3df; border: 2px solid #4a2e1a; font-weight: 700; font-style: normal; }
+  .spread { display: grid; grid-template-columns: 1fr 1fr; gap: 0; position: relative; z-index: 2; min-height: 70vh; }
+  .spread::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, transparent 0%, rgba(138,111,74,0.4) 20%, rgba(138,111,74,0.4) 80%, transparent 100%); transform: translateX(-1px); pointer-events: none; }
+  .left-page { padding: 28px 32px 28px 56px; }
+  .right-page { padding: 28px 56px 28px 32px; }
+  .illus-frame { background: #f9eecf; border: 2px solid #8a6f4a; padding: 16px; }
+  .illus-frame svg { width: 100%; height: auto; display: block; }
+  .illus-cap { font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; text-align: center; margin-top: 14px; padding: 0 30px; line-height: 1.5; }
+  .illus-stats { margin-top: 22px; padding: 14px 18px; background: rgba(196,74,42,0.06); border: 2px solid #c44a2a; }
+  .illus-stats .h { font-family: 'Eczar', serif; font-weight: 700; font-size: 11px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; margin-bottom: 10px; }
+  .illus-stats .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dotted rgba(138,111,74,0.3); font-family: 'Eczar', serif; }
+  .illus-stats .row:last-child { border-bottom: none; }
+  .illus-stats .lbl { font-style: italic; color: #7a5a3a; font-size: 13px; }
+  .illus-stats .val { font-weight: 700; color: #4a2e1a; font-size: 14px; }
+  .chapter-mark { font-family: 'Eczar', serif; font-style: italic; font-size: 13px; letter-spacing: 4px; color: #7a5a3a; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
+  h2 { margin: 0 0 4px; text-align: center; font-family: 'Eczar', serif; font-weight: 700; font-size: 36px; color: #4a2e1a; line-height: 1.1; }
+  .epigraph { text-align: center; font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; margin-bottom: 8px; }
+  .ornament { text-align: center; color: #c89030; margin: 12px 0 22px; font-size: 18px; letter-spacing: 14px; }
+  .narrative { font-family: 'Eczar', serif; font-size: 16px; line-height: 1.65; color: #2a1f15; }
+  .narrative .drop-cap { float: left; font-family: 'Eczar', serif; font-weight: 700; font-size: 64px; line-height: 0.85; color: #c89030; padding: 6px 10px 0 0; }
+  .narrative p { margin: 0 0 14px; }
+  .pull { font-family: 'Eczar', serif; font-style: italic; font-size: 18px; line-height: 1.55; padding: 14px 0 14px 18px; border-left: 3px solid #c44a2a; margin: 16px 0; color: #4a2e1a; }
+  .deeds { margin-top: 22px; padding: 18px 22px; background: rgba(196,74,42,0.05); border: 2px solid #c44a2a; }
+  .deeds .h { font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+  .deed { padding: 8px 0; border-bottom: 1px dotted rgba(138,111,74,0.3); font-family: 'Eczar', serif; font-size: 15px; }
+  .margin { margin-top: 22px; padding-top: 14px; border-top: 1px dotted #8a6f4a; font-family: 'Eczar', serif; font-style: italic; font-size: 13px; color: #7a5a3a; line-height: 1.6; }
+  .margin code { font-family: ui-monospace, monospace; font-style: normal; background: #f3e6c4; padding: 2px 6px; border: 1px solid #c89030; font-size: 12px; }
+  .actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
+  .btn { padding: 10px 18px; border: 2.5px solid #4a2e1a; font-family: 'Eczar', serif; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+  .btn.primary { background: #c44a2a; color: #fbf3df; }
+  .btn.ghost { background: #fbf3df; color: #4a2e1a; }
+  .twinkle { animation: tw 2s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes tw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
+
+  /* shared partial CSS — storybook theme */
+  .qd-back-link { display: inline-block; padding: 4px 10px; background: #fbf3df; border: 2px solid #4a2e1a; color: #4a2e1a; text-decoration: none; font-family: 'Eczar', serif; font-weight: 700; font-style: normal; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+  .qd-back-link:hover { background: #f3e6c4; }
+  .qd-tasks { margin-top: 18px; padding: 16px 20px; background: rgba(196,74,42,0.05); border: 2px solid #c44a2a; }
+  .qd-tasks-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .qd-tasks-title { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; }
+  .qd-tasks-count { font-family: 'Eczar', serif; font-weight: 700; font-size: 13px; color: #c44a2a; }
+  .qd-tasks-list { list-style: none; padding: 0; margin: 0; }
+  .qd-task { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-family: 'Eczar', serif; font-size: 14px; border-bottom: 1px dotted rgba(138,111,74,0.3); }
+  .qd-task:last-child { border-bottom: none; }
+  .qd-task-mark { display: inline-block; width: 18px; height: 18px; border: 1.5px solid #4a2e1a; text-align: center; font-weight: 700; line-height: 15px; font-size: 12px; flex-shrink: 0; background: #fbf3df; }
+  .qd-task-done .qd-task-mark { background: #c44a2a; color: #fbf3df; border-color: #4a2e1a; }
+  .qd-task-done .qd-task-title { color: #7a5a3a; text-decoration: line-through; font-style: italic; }
+  .qd-task-todo .qd-task-mark { color: transparent; }
+  .qd-task-title { color: #2a1f15; }
+  .qd-meta { margin-top: 16px; padding: 14px 18px; background: #f3e6c4; border: 2px solid #8a6f4a; display: grid; gap: 4px; }
+  .qd-meta-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px dotted rgba(138,111,74,0.3); font-family: 'Eczar', serif; }
+  .qd-meta-row:last-child { border-bottom: none; }
+  .qd-meta dt, .qd-meta dd { margin: 0; }
+  .qd-meta dt { font-weight: 700; font-size: 11px; letter-spacing: 2.5px; color: #7a5a3a; text-transform: uppercase; font-style: normal; }
+  .qd-meta dd { font-size: 13px; color: #2a1f15; word-break: break-word; }
+  .qd-meta code { font-family: ui-monospace, monospace; background: #fbf3df; padding: 1px 5px; border: 1px solid #c89030; font-size: 12px; }
+  .qd-progress { position: relative; height: 16px; background: #fbf3df; border: 2px solid #4a2e1a; overflow: hidden; margin-top: 6px; }
+  .qd-progress-fill { height: 100%; background: linear-gradient(180deg, #c44a2a 0%, #8a2818 100%); }
+  .qd-progress-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Eczar', serif; font-weight: 700; font-size: 10px; color: #4a2e1a; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head">
+    <div class="title-row">
+      <svg class="crest" viewBox="0 0 56 56">
+        <path d="M 28 4 L 50 14 V 30 Q 50 46 28 52 Q 6 46 6 30 V 14 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2.5"/>
+        <path d="M 28 12 L 42 18 V 30 Q 42 40 28 44 Q 14 40 14 30 V 18 Z" fill="#c89030" stroke="#4a2e1a" stroke-width="1.5"/>
+        <text x="28" y="32" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="16" fill="#fbf3df">{{level_roman}}</text>
+      </svg>
+      <div>
+        <h1>The Tale of {{name}}</h1>
+        <div class="sub">Chapter {{active.n}} · folio xii</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="route.html">MAP</a>
+      <a href="quest-log.html">CHAPTERS</a>
+    </nav>
+  </header>
+
+  <div class="crumbs">
+    {{> _back-link}}
+    <span>·</span>
+    <a href="quest-log.html">Chapters</a>
+    <span>·</span>
+    <span class="here">Chapter {{active.n}} — {{active.name}}</span>
+  </div>
+
+  <div class="spread">
+    <div class="left-page">
+      <div class="illus-frame">
+        <svg viewBox="0 0 540 460" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="sky-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#fbe8c4"/><stop offset="100%" stop-color="#e8d4a0"/></radialGradient>
+            <radialGradient id="mtn-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#c8b09a"/><stop offset="100%" stop-color="#7a5a40"/></radialGradient>
+          </defs>
+          <rect width="540" height="460" fill="url(#sky-grad-c)"/>
+          <ellipse cx="270" cy="280" rx="220" ry="80" fill="#c8b08a" opacity="0.4"/>
+          <polygon points="180,300 250,140 320,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
+          <polygon points="220,250 250,210 280,250" fill="#fff" opacity="0.6"/>
+          <polygon points="280,300 350,160 420,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
+          <g transform="translate(270,330) scale(2.2)">{{{active.landmark_svg}}}</g>
+          <g class="twinkle">
+            <polygon points="180,180 184,170 192,168 184,166 180,156 176,166 168,168 176,170" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
+            <polygon points="380,200 384,190 392,188 384,186 380,176 376,186 368,188 376,190" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
+          </g>
+        </svg>
+      </div>
+      <p class="illus-cap">— Plate {{active.n}} — {{active.name}}, drawn from the operator's own hand.</p>
+
+      <div class="illus-stats">
+        <div class="h">— Of This Endeavour —</div>
+        <div class="row"><span class="lbl">Reward</span><span class="val">+{{active.xp_reward}} leagues</span></div>
+        <div class="row"><span class="lbl">Progress</span><span class="val">{{active_progress_pct}}%</span></div>
+        <div class="row"><span class="lbl">Region</span><span class="val">Lvl {{level_roman}}</span></div>
+        <div class="row"><span class="lbl">Of total</span><span class="val">Chapter {{active.n}} of {{counts.total}}</span></div>
+      </div>
+    </div>
+
+    <div class="right-page">
+      <div class="chapter-mark">— Chapter the {{active.n}} —</div>
+      <h2>{{active.name}}</h2>
+      <p class="epigraph">{{active.desc}}</p>
+      <div class="ornament">❦ ⁂ ❦</div>
+
+      <div class="narrative">
+        <p><span class="drop-cap">L</span>ONG had the operator pursued this endeavour through its many forms. The chronicle recorded here is a faithful accounting of the deeds undertaken and yet to come.</p>
+        <blockquote class="pull">"{{active.next_step}}"</blockquote>
+        <p>Once accomplished, further chapters unseal — and the operator advances toward the great Lvl {{level_roman}}+1.</p>
+      </div>
+
+      {{> _taskslist}}
+
+      {{> _meta-row}}
+
+      <div class="deeds">
+        <div class="h">— The Operator's Deeds —</div>
+        <div class="deed">▶ {{active.next_step}}</div>
+      </div>
+
+      <p class="margin">📜 Charter: <code>~/.claude/plans/{{active.plan}}</code></p>
+
+      <div class="actions">
+        <a class="btn primary" href="#">Resume the Quest</a>
+        <a class="btn ghost" href="quest-log.html">To Chapters</a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

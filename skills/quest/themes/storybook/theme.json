@@ -1,0 +1,16 @@
+{
+  "name": "storybook",
+  "version": 1,
+  "description": "Illuminated parchment fairytale map. Watercolor terrain, hand-drawn landmarks, sleeping dragon. Eczar serif.",
+  "font": "Eczar",
+  "landmarks": ["house", "tower", "mill", "bridge", "camp", "cave", "castle"],
+  "positions": {
+    "1": "translate(80,460)",
+    "2": "translate(280,380)",
+    "3": "translate(460,320)",
+    "4": "translate(640,320)",
+    "5": "translate(820,280)",
+    "6": "translate(960,180)",
+    "7": "translate(1080,90)"
+  }
+}
