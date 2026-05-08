@@ -43,6 +43,13 @@
   @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
   .twinkle { animation: tw 2s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
   @keyframes tw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.85; } }
+  .qd-chapters { display: flex; align-items: center; gap: 8px; padding: 12px 28px; background: #f3e6c4; border-top: 2px dashed #8a6f4a; font-family: 'Eczar', serif; flex-wrap: wrap; }
+  .qd-chapters-mark { font-size: 16px; }
+  .qd-chapters-label { font-weight: 700; font-size: 12.1px; color: #6a4a30; text-transform: uppercase; letter-spacing: 1.5px; }
+  .qd-chapters-list { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .qd-chapter-pill { padding: 3px 10px; background: #fbf3df; border: 1px solid #8a6f4a; border-radius: 10px; font-style: italic; font-size: 12.1px; color: #4a2e1a; }
+  .qd-dep-blocked { padding: 6px 12px; margin-top: 8px; background: #ede0c0; border: 1px dashed #8a6f4a; border-radius: 6px; font-size: 12.1px; color: #6a4a30; font-style: italic; }
+  .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; font-style: normal; }
 </style>
 </head>
 <body>
@@ -128,7 +135,8 @@
           <circle r="58" fill="#ffd97a" opacity="0.32"/>
         </g>
 
-        <path d="M -52 50 L 52 50 L 46 64 L -46 64 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2"/>
+        <!-- Trapezoid label (auto-sized per quest name length) -->
+        <path d="M -{{q.label_half}} 50 L {{q.label_half}} 50 L {{q.label_half_inner}} 64 L -{{q.label_half_inner}} 64 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2"/>
         <text x="0" y="60" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="11" fill="#4a2e1a">{{q.roman}} · {{q.name}}</text>
       </g>
       {{/each}}
@@ -153,6 +161,7 @@
       <span class="pct">{{active_progress_pct}}%</span>
     </div>
   </footer>
+  {{> _chapters}}
 </div>
 </body>
 </html>

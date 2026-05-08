@@ -2,6 +2,15 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] — 2026-05-08
+
+### Fixed
+- **Quest-label overflow on the route map** — labels under each quest landmark are now auto-sized to fit the quest name. Previously the rect was hardcoded to `width="100"` (pokemon) and the storybook trapezoid to `±52` half-width, so longer names like "The Adoption Watchtower" or "The Evolution Forge" overflowed their backgrounds. Width now derives from name length (`max(80, (chars+8) × 7 + 18)`) via new `label_width` / `label_x` / `label_half` / `label_half_inner` fields populated in `precompute()`.
+- **Quests #8 and beyond rendered at (0,0)** — `theme.json::positions` only listed coords for quests 1–7. Projects with 8+ quests had every additional landmark stacked at the SVG origin (top-left, clipped). Pokemon and storybook themes now ship coords for #8 and #9; #6 / #7 nudged slightly so long-name labels stay within the 1200×540 viewBox.
+
+### Internal
+- `precompute()` per-quest section gains label-sizing math; templates reference `{{q.label_width}}` / `{{q.label_x}}` (pokemon rect) and `{{q.label_half}}` / `{{q.label_half_inner}}` (storybook trapezoid) instead of hardcoded values. Backward-compatible — anyone embedding the templates in their own theme should pick up the auto-sizing for free after this release.
+
 ## [1.4.0] — 2026-05-08
 
 ### Added — Home index
@@ -41,5 +50,6 @@ No action required. Existing `quests.json` files render unchanged. To customize 
 
 Initial public release of the engine. See [v1.2.0 release notes](https://github.com/ytrofr/claude-code-quest/releases/tag/v1.2.0) for the full snapshot: pokemon + storybook themes, autosync hook, systemd unit, MIT license, SEO/AEO/GEO README, CITATION.cff, ISSUE_TEMPLATE.
 
+[1.4.1]: https://github.com/ytrofr/claude-code-quest/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.2.0...v1.4.0
 [1.2.0]: https://github.com/ytrofr/claude-code-quest/releases/tag/v1.2.0

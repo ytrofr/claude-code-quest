@@ -11,6 +11,8 @@
     "4": "translate(640,320)",
     "5": "translate(820,280)",
     "6": "translate(960,180)",
-    "7": "translate(1080,90)"
+    "7": "translate(1080,90)",
+    "8": "translate(880,460)",
+    "9": "translate(640,460)"
   }
 }
