@@ -1,7 +1,10 @@
 <!-- Partial: _meta-row
-     Scope keys used: last_commit.{sha,msg,date}, last_touched_human, blockers_str
+     Scope keys used: last_commit.{sha,msg,date}, last_touched_human, blockers_str,
+                      depends_on_str, depends_on_html, successors_str, successors_html, plans_html
      All fields optional — partial renders only the rows that resolve.
-     Note: why moved into quest brief; branch/kpi/tags moved to .qd-pills near title. -->
+     Note: why moved into quest brief; branch/kpi/tags moved to .qd-pills near title.
+     Storyline rows (Sequel to / Leads to) use {{{...}}} raw output so quest
+     names render as clickable links to predecessors/successors. -->
 <dl class="qd-meta">
   {{#if last_touched_human}}
   <div class="qd-meta-row qd-meta-touched">
@@ -19,6 +22,24 @@
   <div class="qd-meta-row qd-meta-blockers">
     <dt>Blocked by</dt>
     <dd>{{blockers_str}}</dd>
+  </div>
+  {{/if}}
+  {{#if depends_on_str}}
+  <div class="qd-meta-row qd-meta-depends">
+    <dt>Sequel to</dt>
+    <dd>{{{depends_on_html}}}</dd>
+  </div>
+  {{/if}}
+  {{#if successors_str}}
+  <div class="qd-meta-row qd-meta-leads">
+    <dt>Leads to</dt>
+    <dd>{{{successors_html}}}</dd>
+  </div>
+  {{/if}}
+  {{#if plans_html}}
+  <div class="qd-meta-row qd-meta-plans">
+    <dt>Plans</dt>
+    <dd>{{{plans_html}}}</dd>
   </div>
   {{/if}}
 </dl>

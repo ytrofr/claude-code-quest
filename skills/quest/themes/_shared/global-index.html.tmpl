@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<!-- Top-level template: the global home index at /index.html (Trainer Hall layout).
+     Rendered by render.py::render_global_index() against the scope built in
+     precompute_global_index(). All Pokémon-themed (cream/sky-blue/yellow palette)
+     so it matches the per-project pages. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quest Dashboard — Trainer Hall</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Fredoka', system-ui, sans-serif; background: #5db4d8; padding: 18px; }
+  .frame { max-width: 1280px; margin: 0 auto; background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 30px rgba(20,40,60,0.4); }
+
+  .head { padding: 14px 22px; background: linear-gradient(180deg, #fff 0%, #f7eed8 100%); border-bottom: 4px solid #2a3a4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .head-title { display: flex; align-items: center; gap: 14px; }
+  .crest { width: 56px; height: 56px; background: #ffd24a; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 3px 0 #c9a020; line-height: 1; }
+  h1 { margin: 0; font-weight: 700; font-size: 26.4px; color: #2a3a4a; line-height: 1.1; }
+  .sub { font-weight: 500; font-size: 14.3px; color: #6a7a8a; margin-top: 2px; }
+  .totals { display: flex; gap: 8px; flex-wrap: wrap; }
+  .total { padding: 8px 14px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 14px; box-shadow: 0 3px 0 #2a3a4a; font-weight: 700; font-size: 12.1px; color: #2a3a4a; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .total .num { display: inline-block; padding: 1px 8px; background: #ffd24a; border-radius: 8px; font-size: 13.2px; }
+
+  .section { padding: 16px 22px 6px; background: #f7eed8; border-bottom: 3px solid #2a3a4a; }
+  .section-h { margin: 0; font-size: 13.2px; font-weight: 700; letter-spacing: 2.5px; color: #2a3a4a; text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+  .section-h::before { content: ''; display: inline-block; width: 14px; height: 14px; background: #ff6a3a; border: 2.5px solid #2a3a4a; border-radius: 50%; box-shadow: 0 2px 0 #5a1818; }
+
+  .grid { padding: 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px; background: #fffdf2; }
+
+  .card { position: relative; background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 14px; overflow: hidden; box-shadow: 0 5px 0 #2a3a4a; transition: transform .15s; cursor: pointer; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 0 #2a3a4a; }
+  /* Stretched-link pattern: the primary "Begin Adventure" anchor covers the whole card via ::after.
+     The Pokédex secondary link sits on top via z-index so it stays independently clickable. */
+  .card .btn.primary { text-decoration: none; }
+  .card .btn.primary::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+  .card .btn.ghost { position: relative; z-index: 2; text-decoration: none; }
+
+  .strip { height: 110px; position: relative; border-bottom: 3px solid #2a3a4a; overflow: hidden; }
+  .strip svg.scenery { width: 100%; height: 100%; display: block; }
+  .strip.storybook { background: linear-gradient(180deg, #f3e6c4 0%, #f3e6c4 30%, #c44a2a 30%); }
+  .strip:not(.storybook) { background: linear-gradient(180deg, #bbe4f5 0%, #bbe4f5 30%, var(--grass-light, #8fc97a) 30%); }
+  .num-badge { position: absolute; top: 8px; left: 8px; width: 40px; height: 40px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 19px; color: #2a3a4a; line-height: 1; box-shadow: 0 2px 0 #2a3a4a; z-index: 2; }
+  .lvl-pill { position: absolute; top: 8px; right: 8px; padding: 5px 12px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 12px; font-weight: 700; font-size: 12.1px; letter-spacing: 1.2px; text-transform: uppercase; color: #2a3a4a; z-index: 2; box-shadow: 0 2px 0 #c9a020; }
+  .theme-stamp { position: absolute; bottom: 6px; right: 8px; padding: 3px 9px; background: rgba(42,58,74,0.85); color: #ffd24a; border-radius: 8px; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; z-index: 2; }
+  .strip.storybook .theme-stamp { background: rgba(74,46,26,0.85); color: #fbf3df; }
+
+  .body { padding: 14px 16px 16px; }
+  .name { margin: 0 0 4px; font-weight: 700; font-size: 19.8px; color: #2a3a4a; line-height: 1.15; }
+  .desc { margin: 0 0 10px; font-weight: 500; font-size: 13.5px; color: #5a6a7a; line-height: 1.4; min-height: 38px; }
+
+  .xp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .xp-lbl { font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase; color: #5a1818; font-weight: 700; }
+  .xp-val { font-size: 12.1px; font-weight: 700; color: #2a3a4a; }
+  .xp-bar { height: 14px; background: #f0e4cc; border: 2.5px solid #2a3a4a; border-radius: 10px; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 2px 0 rgba(42,58,74,0.15); }
+  .xp-fill { height: 100%; background: linear-gradient(180deg, #ffd24a 0%, #d4a020 100%); transition: width 1.4s cubic-bezier(.2,.7,.3,1); }
+
+  .pills { display: flex; gap: 6px; margin-bottom: 12px; }
+  .pill { flex: 1; padding: 7px 4px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 12px; text-align: center; font-weight: 700; font-size: 11px; letter-spacing: 1px; color: #2a3a4a; box-shadow: 0 2px 0 #2a3a4a; }
+  .pill .v { display: block; font-size: 17.6px; line-height: 1; margin-bottom: 2px; }
+  .pill.active { background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 2px 0 #5a1818; }
+  .pill.done   { background: #5e9a4a; color: #fff; border-color: #2e6a2a; box-shadow: 0 2px 0 #2e6a2a; }
+  .pill.locked { background: #e0d4bc; color: #6a5a4a; }
+
+  .battling { padding: 9px 12px; background: rgba(255,106,58,0.08); border: 2.5px dashed #ff6a3a; border-radius: 8px; margin-bottom: 14px; }
+  .bat-lbl { font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase; color: #5a1818; font-weight: 700; margin-bottom: 2px; }
+  .bat-name { font-size: 13.2px; font-weight: 700; color: #5a1818; line-height: 1.3; }
+  .bat-name::before { content: '⚔ '; }
+  .battling.idle { background: rgba(120,120,120,0.06); border-color: #999; }
+  .battling.idle .bat-lbl { color: #6a5a4a; }
+  .battling.idle .bat-name { color: #6a5a4a; }
+  .battling.idle .bat-name::before { content: '✦ '; }
+
+  .actions { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 10px 12px; border-radius: 12px; font-family: inherit; font-weight: 700; font-size: 12.1px; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; transition: transform 0.1s ease; border: 2.5px solid #2a3a4a; cursor: pointer; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { flex: 2; background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 3px 0 #5a1818; }
+  .btn.primary:hover { box-shadow: 0 4px 0 #5a1818; }
+  .btn.ghost { background: #fffdf2; color: #2a3a4a; box-shadow: 0 3px 0 #2a3a4a; }
+  .btn.ghost:hover { box-shadow: 0 4px 0 #2a3a4a; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <header class="head">
+    <div class="head-title">
+      <div class="crest">⚔</div>
+      <div>
+        <h1>Trainer Hall</h1>
+        <div class="sub">Welcome back, Trainer · pick a region to adventure</div>
+      </div>
+    </div>
+    <div class="totals">
+      <span class="total"><span class="num">{{totals.levels}}</span>Levels</span>
+      <span class="total"><span class="num">{{totals.xp}}</span>Total XP</span>
+      <span class="total"><span class="num">{{totals.done}}</span>Routes Cleared</span>
+      <span class="total"><span class="num">{{totals.active}}</span>Active Battles</span>
+    </div>
+  </header>
+
+  <div class="section">
+    <h2 class="section-h">Choose Your Region</h2>
+  </div>
+
+  <div class="grid">
+    {{#each projects_list}}
+    <div class="card" style="--grass-light: {{q.grass_light}};">
+      <div class="strip {{q.strip_class}}">
+        <svg class="scenery" viewBox="0 0 280 110" preserveAspectRatio="xMidYMid meet">
+          <path d="M 0 60 Q 80 50 140 60 Q 200 70 280 58 L 280 110 L 0 110 Z" fill="{{q.grass_dark}}"/>
+          <ellipse cx="140" cy="100" rx="60" ry="6" fill="rgba(0,0,0,0.18)"/>
+          <g transform="translate(140,68) scale(1.7)">{{{q.icon_svg}}}</g>
+        </svg>
+        <div class="num-badge">{{q.n}}</div>
+        <div class="lvl-pill">Lv {{q.level}}</div>
+        <div class="theme-stamp">{{q.theme_label}}</div>
+      </div>
+      <div class="body">
+        <h3 class="name">{{q.name}}</h3>
+        <p class="desc">{{q.subtitle}}</p>
+        <div class="xp-row"><span class="xp-lbl">Region XP</span><span class="xp-val">{{q.xp_current}} / {{q.xp_max}}</span></div>
+        <div class="xp-bar"><div class="xp-fill" style="width: {{q.xp_pct}}%"></div></div>
+        <div class="pills">
+          <span class="pill active"><span class="v">{{q.counts.current}}</span>Active</span>
+          <span class="pill done"><span class="v">{{q.counts.done}}</span>Visited</span>
+          <span class="pill locked"><span class="v">{{q.counts.locked}}</span>Sealed</span>
+        </div>
+        {{#if q.has_active}}
+        <div class="battling">
+          <div class="bat-lbl">Currently Battling</div>
+          <div class="bat-name">{{q.active_label}}</div>
+        </div>
+        {{/if}}
+        {{#if q.no_active}}
+        <div class="battling idle">
+          <div class="bat-lbl">Idle</div>
+          <div class="bat-name">No active quest — start one</div>
+        </div>
+        {{/if}}
+        <div class="actions">
+          <a class="btn primary" href="{{q.route_href}}">▶ Begin Adventure</a>
+          <a class="btn ghost" href="{{q.log_href}}">Pokédex</a>
+        </div>
+      </div>
+    </div>
+    {{/each}}
+  </div>
+
+</div>
+
+<script>
+window.addEventListener('load', () => {
+  document.querySelectorAll('.xp-fill').forEach(el => {
+    const w = el.style.width;
+    el.style.width = '0%';
+    requestAnimationFrame(() => { el.style.width = w; });
+  });
+});
+</script>
+</body>
+</html>

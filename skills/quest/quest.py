@@ -227,8 +227,168 @@ def cmd_theme(args) -> int:
     return render_now()
 
 
+def cmd_style(args) -> int:
+    """Set the home-index card accent color and/or landmark icon for a project.
+
+    Both fields are optional — pass --accent or --icon (or both). Render.py
+    falls back to per-pid defaults when not set, so unset === default look.
+    Accent must be a 6-digit hex like #ff6a3a; icon must match a landmark in
+    the project's theme directory (house/camp/castle/cave/tower/bridge/mill).
+    """
+    data = load()
+    project = get_project(data, args.project_id)
+    changes = []
+    if args.accent is not None:
+        accent = args.accent.strip()
+        if accent and not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+            sys.exit(f"ERROR: accent must be a 6-digit hex like #ff6a3a (got '{accent}')")
+        old = project.get("accent")
+        if accent:
+            project["accent"] = accent
+            changes.append(f"accent {old or '(default)'} → {accent}")
+        else:
+            project.pop("accent", None)
+            changes.append(f"accent {old or '(default)'} → (default)")
+    if args.icon is not None:
+        icon = args.icon.strip()
+        if icon and icon not in LANDMARKS:
+            sys.exit(f"ERROR: icon must be one of {LANDMARKS} (got '{icon}')")
+        old = project.get("icon")
+        if icon:
+            project["icon"] = icon
+            changes.append(f"icon {old or '(default)'} → {icon}")
+        else:
+            project.pop("icon", None)
+            changes.append(f"icon {old or '(default)'} → (default)")
+    if not changes:
+        print("No changes — pass --accent #hex and/or --icon name")
+        return 0
+    save(data)
+    print(f"{args.project_id}: {' · '.join(changes)}")
+    return render_now()
+
+
 def cmd_render(args) -> int:
     return render_now()
+
+
+def cmd_reset(args) -> int:
+    """Archive current+done quests into chapters[<name>], optionally clear locked.
+
+    Mental model: closing a chapter and starting a new map. Done/active quests
+    become 'past adventures'. Locked quests survive by default (so the next
+    backlog moves forward). Pass --clean to wipe locked too.
+
+    Level/xp reset to baseline. Chapters are append-only — re-using the same
+    chapter name appends new entries to the existing array.
+
+    SAFETY GATE: defaults to preview-only. Pass --yes to actually mutate. This
+    prevents accidental NL-triggered resets ('we wrapped that up' said in
+    passing should not nuke 14 quests)."""
+    data = load()
+    project = get_project(data, args.project_id)
+
+    # Validate chapter name
+    chap = (args.chapter or "").strip()
+    if not chap:
+        sys.exit("ERROR: --chapter <name> is required (e.g. 'q2-2026-bundle-a')")
+    chap_slug = slug(chap)
+
+    quests = project.get("quests", [])
+    if not quests:
+        sys.exit(f"ERROR: project '{args.project_id}' has no quests to archive")
+
+    # Partition
+    archived = []
+    surviving = []
+    for q in quests:
+        st = q.get("status", "locked")
+        if st in ("done", "current"):
+            archived.append(q)
+        elif st == "locked" and not args.clean:
+            surviving.append(q)
+        else:  # locked + --clean → archive these too
+            archived.append(q)
+
+    # Preview without --yes — show what WOULD happen and exit.
+    if not args.yes:
+        print(f"PREVIEW (no changes made — pass --yes to commit):")
+        print(f"  project: {args.project_id}")
+        print(f"  chapter: '{chap_slug}'")
+        print(f"  archive ({len(archived)}):")
+        for q in archived:
+            tag = q.get("status", "?")
+            print(f"    [{tag:7s}] #{q.get('n','?'):>2} {q.get('name','?')}")
+        print(f"  survive ({len(surviving)}):")
+        for q in surviving:
+            print(f"    [{q.get('status','?'):7s}] #{q.get('n','?'):>2} {q.get('name','?')}")
+        if surviving:
+            print(f"  level/xp reset to baseline · '{surviving[0].get('name','?')}' will be promoted to current")
+        else:
+            print(f"  level/xp reset to baseline · NO surviving quests (project will be empty until next /quest add)")
+        if args.clean:
+            print(f"  --clean: locked quests are also archived")
+        print(f"\nTo commit: rerun with --yes")
+        return 0
+
+    if not archived and not surviving:
+        sys.exit("ERROR: partition produced 0 quests on both sides — nothing to do")
+
+    chapters = project.setdefault("chapters", {})
+    existing = chapters.setdefault(chap_slug, [])
+
+    # Assign archive metadata + append
+    import datetime as dt
+    archived_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    for q in archived:
+        q["archived_at"] = archived_at
+        # Drop interactive fields that no longer matter in a frozen chapter
+        q.pop("next_step", None)
+        existing.append(q)
+
+    # Renumber surviving (now n=1, 2, ...) — keep order
+    for i, q in enumerate(surviving, start=1):
+        q["n"] = i
+    # Promote first surviving locked → current if any survive
+    promoted = ""
+    if surviving:
+        any_current = any(q.get("status") == "current" for q in surviving)
+        if not any_current:
+            surviving[0]["status"] = "current"
+            promoted = surviving[0].get("name", "")
+
+    project["quests"] = surviving
+    # Reset level/xp baseline
+    threshold = data.get("level_threshold", 100)
+    project["level"] = 1
+    project["xp"] = {"current": 0, "max": threshold}
+
+    save(data)
+    archived_count = len(archived)
+    surviving_count = len(surviving)
+    print(f"Reset {args.project_id}: chapter '{chap_slug}' (+{archived_count} archived) · {surviving_count} surviving quest(s)")
+    if promoted:
+        print(f"  Promoted to current: {promoted}")
+    return render_now()
+
+
+def cmd_chapters(args) -> int:
+    """List archived chapters for a project (or all)."""
+    data = load()
+    if args.project_id:
+        ps = {args.project_id: get_project(data, args.project_id)}
+    else:
+        ps = data["projects"]
+    for pid, project in ps.items():
+        chapters = project.get("chapters") or {}
+        if not chapters:
+            print(f"  {pid}: (no chapters yet)")
+            continue
+        print(f"  {pid}:")
+        for name, qs in chapters.items():
+            done = sum(1 for q in qs if q.get("status") == "done")
+            print(f"    📜 {name} — {len(qs)} quest(s) ({done} done)")
+    return 0
 
 
 # ---- argparse setup ----
@@ -281,8 +441,25 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("theme_name")
     s.set_defaults(func=cmd_theme)
 
+    s = sub.add_parser("style", help="Set the home-index card accent + icon for a project")
+    s.add_argument("project_id")
+    s.add_argument("--accent", help="6-digit hex color, e.g. #ff6a3a (empty string = clear)")
+    s.add_argument("--icon", help=f"Landmark icon name. One of: {', '.join(LANDMARKS)} (empty string = clear)")
+    s.set_defaults(func=cmd_style)
+
     s = sub.add_parser("render", help="Regenerate all HTML")
     s.set_defaults(func=cmd_render)
+
+    s = sub.add_parser("reset", help="Close current chapter — archive done/active quests, start fresh map")
+    s.add_argument("project_id")
+    s.add_argument("--chapter", required=True, help="Name for the archived chapter (e.g. 'q2-2026-bundle-a')")
+    s.add_argument("--clean", action="store_true", help="Also archive locked quests (default: locked survive into the new chapter)")
+    s.add_argument("--yes", "-y", action="store_true", help="Skip preview and commit. Without this, --yes prints a preview and exits.")
+    s.set_defaults(func=cmd_reset)
+
+    s = sub.add_parser("chapters", help="List archived chapters")
+    s.add_argument("project_id", nargs="?", help="Optional — defaults to all projects")
+    s.set_defaults(func=cmd_chapters)
 
     return p
 

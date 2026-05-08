@@ -3,7 +3,7 @@ name: quest
 description: "Manage RPG-style project roadmaps — central quests.json + themed HTML dashboard at http://localhost:8770. Use when adding/updating/completing a quest, switching a project's theme, or asking 'what's the status of my projects?'."
 user-invocable: true
 allowed-tools: "Bash, Read"
-argument-hint: "<status|init|add|update|done|theme|render> [args]"
+argument-hint: "<status|init|add|update|done|theme|style|render|reset|chapters> [args]"
 ---
 
 # /quest — RPG-style project roadmap
@@ -22,7 +22,10 @@ Visualize your projects as gamified RPG maps. Each project gets a themed dashboa
 | `/quest update <project> <quest>` | Patch progress, next step, name, etc. |
 | `/quest done <project> <quest>` | Mark done; awards XP; promotes next locked → current |
 | `/quest theme <project> <theme>` | Swap theme (e.g. pokemon ↔ storybook) |
+| `/quest style <project> --accent <#hex> --icon <name>` | Set the home-index card accent color and landmark icon (per-project override) |
 | `/quest render` | Regenerate all HTML |
+| `/quest reset <project> --chapter <name>` | **Preview only by default.** Pass `--yes`/`-y` to actually archive. `--clean` archives locked too. |
+| `/quest chapters [<project>]` | List archived chapters (one or all projects) |
 
 After every mutating command, the renderer runs automatically.
 
@@ -37,7 +40,69 @@ python3 ~/.claude/skills/quest/quest.py add apollo "Build login flow" --landmark
 python3 ~/.claude/skills/quest/quest.py update apollo build-login --progress 0.8 --next "ship to staging"
 python3 ~/.claude/skills/quest/quest.py done apollo build-login
 python3 ~/.claude/skills/quest/quest.py theme apollo storybook
+python3 ~/.claude/skills/quest/quest.py style apollo --accent "#3aaa6a" --icon castle
+python3 ~/.claude/skills/quest/quest.py reset apollo --chapter "phase-1-launch"
+python3 ~/.claude/skills/quest/quest.py chapters apollo
 ```
+
+## Chapters (map reset)
+
+When a project finishes a major phase and you want a fresh roadmap, run `/quest reset <project> --chapter <name>`. **By default, this PREVIEWS only and exits — pass `--yes` (or `-y`) to actually mutate.** This prevents an ambiguous "we wrapped that up" remark from accidentally nuking 14 quests.
+
+Preview output:
+```
+PREVIEW (no changes made — pass --yes to commit):
+  project: limor
+  chapter: 'phase-1-anchor'
+  archive (5):
+    [done   ] # 1 Anchor Town
+    [current] # 2 Bundle B Code Pass
+    ...
+  survive (7):
+    [locked ] # 3 Auditor V2 Hardening
+    ...
+  level/xp reset to baseline · 'Auditor V2 Hardening' will be promoted to current
+
+To commit: rerun with --yes
+```
+
+Done + current quests are archived into `chapters[<name>]` (frozen, with `archived_at` timestamp). Locked quests survive into the new map by default — first locked auto-promotes to current. Pass `--clean` to wipe locked too. Level/xp reset to baseline.
+
+Past chapters appear as a "📜 Past chapters: <name> (N)" badge under the route map. Chapters are append-only — re-using the same `--chapter <name>` appends to the existing list.
+
+## Home Index (Trainer Hall)
+
+The dashboard root at <http://localhost:8770/> renders a **Trainer Hall** — one Pokémon-style card per project, in a responsive grid. Each card shows: numbered badge, level pill, theme stamp, sky-and-grass hero strip with a landmark icon, project name + subtitle, gold XP bar, three stat pills (Active / Visited / Sealed), a "Currently Battling" callout for the active quest, and **Begin Adventure** + **Pokédex** buttons.
+
+The hero strip color and landmark icon are per-project — drawn from optional `accent` and `icon` fields on the project (set via `/quest style`). Defaults exist for the six built-in projects; new projects rotate through a built-in palette + icon list until you call `/quest style` to lock them in.
+
+```bash
+# pick the look for a new project
+python3 ~/.claude/skills/quest/quest.py style apollo --accent "#3aaa6a" --icon castle
+
+# clear back to defaults
+python3 ~/.claude/skills/quest/quest.py style apollo --accent "" --icon ""
+```
+
+The header crown bar shows aggregate **Levels / Total XP / Routes Cleared / Active Battles** summed across every project.
+
+Implementation: template at `~/.claude/skills/quest/themes/_shared/global-index.html.tmpl`; scope built by `precompute_global_index()` in `render.py`. No partials — pure top-level template.
+
+## Sequential dependencies
+
+Add `depends_on: [quest-id-1, quest-id-2]` to a quest in JSON (or write `> **Depends on**: id1, id2` in a plan's BLUF block — autosync will pick it up). The renderer surfaces this in two places:
+
+- **Quest log** (locked card): "After: #N Quest Name" hint below the lock row
+- **Plan card** (active quest): "Sequel to:" row in the meta block
+
+A quest's `depends_on_str` resolves ids to "#N name" format automatically. Unresolved ids (deleted quest) display raw.
+
+**Auto-suggested**: when autosync adds a NEW quest whose plan body mentions an existing quest by id (e.g. `` `build-foo` ``) or full name AND the BLUF lacks `**Depends on**:`, autosync logs a hint to `~/.claude/quest/logs/autosync.log`:
+```
+HINT limor/new-quest: plan mentions existing quest(s) ['build-foo'] —
+add `> **Depends on**: build-foo` to BLUF if sequential
+```
+Hint only — never auto-writes. Apply by editing the plan's BLUF and triggering another autosync run.
 
 ## Auto-progress (no token cost)
 
@@ -55,6 +120,8 @@ If a plan file is new (no matching quest exists), autosync ADDS a quest. If it m
       "name": "Apollo",
       "subtitle": "User-facing dashboard",
       "theme": "pokemon",
+      "accent": "#3aaa6a",
+      "icon": "castle",
       "level": 2,
       "xp": {"current": 50, "max": 100},
       "quests": [
@@ -86,7 +153,11 @@ If a plan file is new (no matching quest exists), autosync ADDS a quest. If it m
 }
 ```
 
-**Fields you'll touch via commands**: `name`, `desc`, `landmark`, `status` (done/current/locked), `progress` (0.0-1.0), `next_step`, `plan`, `theme`. Never hand-edit the JSON; use the commands.
+**Fields you'll touch via commands**: `name`, `desc`, `landmark`, `status` (done/current/locked), `progress` (0.0-1.0), `next_step`, `plan`, `theme`, `accent`, `icon`. Never hand-edit the JSON; use the commands.
+
+**Project-level home-index fields** (both optional, both have defaults):
+- `accent` — 6-digit hex (e.g. `#ff6a3a`) used for the hero strip foreground hill, the lightened sky tint, and the colored progress accents on the home-index card. Per-pid defaults in `render.py::DEFAULT_ACCENTS`. Override via `/quest style <project> --accent <#hex>`.
+- `icon` — landmark name from the project's theme (`house`, `tower`, `mill`, `bridge`, `camp`, `cave`, `castle`). Drawn inside the hero strip. Per-pid defaults in `render.py::DEFAULT_ICONS`. Override via `/quest style <project> --icon <name>`.
 
 ## Theme system
 
