@@ -2,12 +2,19 @@
      Scope keys used: tasks (list), tasks_done (int), tasks_total (int)
      Renders only when `tasks` is non-empty.
      Each task object: { title, done, done_class, done_mark, problem?, solution?, has_brief? }
-     If has_brief, the row becomes a clickable <details> with a problem→solution expansion. -->
+     If has_brief, the row becomes a clickable <details> with a problem→solution expansion.
+     The "Hide Done" toggle in the header sets body.hide-done-deeds; CSS in each
+     theme's plan-card.html.tmpl hides .qd-task-done rows when that class is set.
+     State persisted via the per-project qd-filter-<pid> localStorage key. -->
 {{#if tasks}}
 <section class="qd-tasks" data-qd="tasks">
   <header class="qd-tasks-head">
     <h3 class="qd-tasks-title">Deeds</h3>
     <span class="qd-tasks-count">{{tasks_done}} / {{tasks_total}}</span>
+    <button class="qd-deeds-toggle" type="button" data-toggle="hide-done-deeds" aria-pressed="false" title="Hide completed deeds">
+      <span class="qd-toggle-mark" aria-hidden="true">○</span>
+      <span class="qd-toggle-label">Hide done</span>
+    </button>
   </header>
   <ul class="qd-tasks-list">
     {{#each tasks}}

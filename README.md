@@ -41,12 +41,15 @@ It's not trying to compete with team-issue trackers. It's the personal layer abo
 
 | Component | What |
 |---|---|
-| `/quest` skill | `status`, `add`, `update`, `done`, `theme`, `render`, `init` subcommands |
-| Hand-rolled renderer | Zero-dep Python (~280 LOC). `{{var}}`, `{{#each}}`, `{{#if}}`, `{{> partial}}` |
+| `/quest` skill | `status`, `init`, `add`, `update`, `done`, `theme`, `style`, `render`, `reset`, `chapters` subcommands |
+| Hand-rolled renderer | Zero-dep Python (~430 LOC). `{{var}}`, `{{#each}}`, `{{#if}}`, `{{> partial}}` |
 | Two ready themes | Pokémon (cartoon, Fredoka) + Storybook (parchment, Eczar) — 3 views × 7 landmark SVGs each |
 | Shared partials | `_back-link`, `_taskslist`, `_meta-row`, `_progress-bar`, `_pills`, `_why`, `_next-step` |
+| Trainer Hall home index | Pokémon-themed card grid at `/` — one card per project with level pill, gold XP bar, 3 stat pills, "Currently Battling" callout, and Begin Adventure + Pokédex buttons. Per-project `accent` (hex) + `icon` (landmark) overrides via `/quest style`. |
 | Click-to-expand briefs | Each task and the next-step expand to show "Problem → Solution" sentences |
-| Status filter bar | All / Active / Visited / Sealed (Pokémon) — All / Reading / Read / Sealed (Storybook), URL-bookmarkable |
+| Multi-select status filter | Active / Visited / Sealed pills toggle independently on quest-log, persisted per-project in `localStorage`. Plus "Show All" / "Active Only" quick-actions. |
+| Hide-done deeds toggle | Per-quest plan-card has a "Hide done" toggle that hides ticked sub-tasks; shares the same `localStorage` key as the status filter. |
+| Storyline rendering | Plan-card meta box shows **Sequel to** ◀ (predecessors from `depends_on`), **Leads to** ▶ (auto-computed successors), and **Plans** (originating plan + sub-plans). Quest names are clickable links. |
 | Auto-progress hook | PostToolUse async, parses `## Section 13` checkboxes into `tasks[]` + `progress` — **zero LLM calls** |
 | Plan sub-bullet parser | `- [x] Title` followed by `- Problem: …` / `- Solution: …` becomes click-expandable detail |
 | systemd unit | localhost:8770, hardened (`ProtectSystem=strict`), auto-starts on boot |

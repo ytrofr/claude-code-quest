@@ -125,6 +125,9 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
     theme = project.get("theme", "pokemon")
     positions = (theme_meta.get(theme, {}) or {}).get("positions", {})
 
+    # Build id→quest map first (needed for depends_on resolution per quest)
+    by_id = {q.get("id", ""): q for q in quests}
+
     # Per-quest derivations
     for q in quests:
         q["status_class"] = q.get("status", "locked")
@@ -162,16 +165,100 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
         # Next-step expandable marker
         if q.get("next_step") and not q.get("next_step_problem"):
             q["no_next_brief"] = True
+        # Sequential dependency hints — resolve quest-id → "#N name"
+        deps = q.get("depends_on") or []
+        if deps:
+            resolved = []
+            html_parts = []
+            for did in deps:
+                dq = by_id.get(did)
+                if dq:
+                    label = f"#{dq.get('n','?')} {dq.get('name','?')}"
+                    resolved.append(label)
+                    href = f"plan-card.html?q={html.escape(did, quote=True)}"
+                    html_parts.append(
+                        f'<a class="qd-storyline-link" href="{href}">'
+                        f'{html.escape(label, quote=True)}</a>'
+                    )
+                else:
+                    resolved.append(did)
+                    html_parts.append(html.escape(did, quote=True))
+            q["depends_on_str"] = ", ".join(resolved)
+            q["depends_on_html"] = (
+                '<span class="qd-storyline-arrow" aria-hidden="true">◀ </span>'
+                + " · ".join(html_parts)
+            )
+            # Locked-by-dep marker: only if status is locked AND any dep is incomplete
+            unmet = [by_id.get(d) for d in deps if by_id.get(d)]
+            if unmet and any((dq.get("status") != "done") for dq in unmet) and q.get("status") == "locked":
+                q["dep_blocked"] = True
+
+        # Successors — reverse lookup: quests that list THIS quest in their depends_on.
+        my_id = q.get("id", "")
+        successors = []
+        if my_id:
+            for other in quests:
+                if other is q:
+                    continue
+                if my_id in (other.get("depends_on") or []):
+                    successors.append(other)
+        if successors:
+            labels = [f"#{s.get('n','?')} {s.get('name','?')}" for s in successors]
+            q["successors_str"] = ", ".join(labels)
+            s_parts = []
+            for s in successors:
+                label = f"#{s.get('n','?')} {s.get('name','?')}"
+                href = f"plan-card.html?q={html.escape(s.get('id',''), quote=True)}"
+                s_parts.append(
+                    f'<a class="qd-storyline-link" href="{href}">'
+                    f'{html.escape(label, quote=True)}</a>'
+                )
+            q["successors_html"] = (
+                " · ".join(s_parts)
+                + ' <span class="qd-storyline-arrow" aria-hidden="true">▶</span>'
+            )
+
+        # Plan files — originating `plan` (singular, autosync-set) + optional
+        # `plans` array of sub-plans (manually edited or future autosync).
+        plan_files = []
+        seen = set()
+        if q.get("plan"):
+            plan_files.append(q["plan"])
+            seen.add(q["plan"])
+        for p in (q.get("plans") or []):
+            if p and p not in seen:
+                plan_files.append(p)
+                seen.add(p)
+        if plan_files:
+            chips = [
+                f'<code class="qd-plan-chip">{html.escape(p, quote=True)}</code>'
+                for p in plan_files
+            ]
+            q["plans_html"] = " ".join(chips)
+            q["plans_count"] = len(plan_files)
 
     # Hoist active quest's v2 fields onto project scope so plan-card partials
     # (which run at project scope) can reference {{tasks}}, {{branch}}, etc.
     if active:
         for k in ("tasks", "tasks_done", "tasks_total", "branch", "last_commit",
                   "last_touched", "last_touched_human", "why", "blockers_str",
-                  "tags_str", "kpi", "depends_on", "links", "effort"):
+                  "tags_str", "kpi", "depends_on", "depends_on_str", "depends_on_html",
+                  "successors_str", "successors_html", "plans_html", "plans_count",
+                  "dep_blocked",
+                  "links", "effort", "problem", "solution",
+                  "next_step_problem", "next_step_solution"):
             if k in active:
                 project[k] = active[k]
         project["progress_pct"] = int(100 * active.get("progress", 0))
+
+    # Chapter list (past adventures) — only set if non-empty
+    chapters = project.get("chapters") or {}
+    if chapters:
+        project["chapters_list"] = [
+            {"name": name, "count": len(quests_in)}
+            for name, quests_in in chapters.items() if quests_in
+        ]
+        project["has_chapters"] = bool(project["chapters_list"])
 
     return project
 
@@ -325,41 +412,128 @@ def render_project(project: dict, theme: str) -> dict:
     return out
 
 
-def render_global_index(data: dict) -> str:
-    """Tiny landing page listing all projects with links."""
-    rows = []
-    for pid, p in data["projects"].items():
-        name = html.escape(p.get("name", pid))
-        sub = html.escape(p.get("subtitle", ""))
-        theme = html.escape(p.get("theme", "pokemon"))
-        lvl = p.get("level", 1)
+# ---- Global home index (Trainer Hall) ----
+
+# Default per-project accent + landmark icon. Both are overridable via
+# `accent` / `icon` fields on a project in quests.json. Fallback when a project
+# isn't in this map: rotate through ACCENT_PALETTE / ICON_ROTATION by index.
+DEFAULT_ACCENTS: dict[str, str] = {
+    "limor":    "#ff6a3a",
+    "smith":    "#3aaa6a",
+    "ogas":     "#9a6ace",
+    "gamify":   "#e8b430",
+    "logivote": "#3a8aa0",
+    "remotion": "#c44a2a",
+}
+DEFAULT_ICONS: dict[str, str] = {
+    "limor":    "house",
+    "smith":    "camp",
+    "ogas":     "castle",
+    "gamify":   "camp",
+    "logivote": "cave",
+    "remotion": "tower",
+}
+ACCENT_PALETTE: list[str] = ["#ff6a3a", "#3aaa6a", "#9a6ace", "#e8b430", "#3a8aa0", "#c44a2a", "#5db4d8", "#ffd24a"]
+ICON_ROTATION: list[str] = ["house", "camp", "castle", "cave", "tower", "bridge", "mill"]
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    h = hex_color.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def lighten(hex_color: str, factor: float = 0.5) -> str:
+    """Mix toward white. factor=0 returns input; factor=1 returns white."""
+    r, g, b = _hex_to_rgb(hex_color)
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def precompute_global_index(data: dict) -> dict:
+    """Build the scope passed to the global-index.html.tmpl template.
+
+    Aggregates totals across projects + per-project derived fields (counts,
+    accent, icon SVG, formatted active-quest label, route/log hrefs). The
+    template renders 6 cards (or however many projects exist) in the
+    Trainer Hall layout.
+    """
+    projects = data.get("projects", {})
+
+    totals = {
+        "levels": sum(p.get("level", 1) for p in projects.values()),
+        "xp":     sum((p.get("xp") or {}).get("current", 0) for p in projects.values()),
+        "done":   sum(sum(1 for q in p.get("quests", []) if q.get("status") == "done") for p in projects.values()),
+        "active": sum(sum(1 for q in p.get("quests", []) if q.get("status") == "current") for p in projects.values()),
+    }
+
+    projects_list = []
+    for n, (pid, p) in enumerate(projects.items(), start=1):
+        quests = p.get("quests", [])
+        counts = {
+            "current": sum(1 for q in quests if q.get("status") == "current"),
+            "done":    sum(1 for q in quests if q.get("status") == "done"),
+            "locked":  sum(1 for q in quests if q.get("status") == "locked"),
+        }
+        active = next((q for q in quests if q.get("status") == "current"), None)
+        theme = p.get("theme", "pokemon")
         xp = p.get("xp", {"current": 0, "max": 100})
-        rows.append(
-            f'<li><a href="{pid}/route.html"><strong>{name}</strong></a> '
-            f'— <em>{sub}</em> · Lv {lvl} · {xp["current"]}/{xp["max"]} XP · '
-            f'<span class="theme">{theme}</span> '
-            f'(<a href="{pid}/quest-log.html">log</a>)</li>'
-        )
-    return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Quest Dashboard</title>
-<style>
-body {{ font: 17.6px/1.5 system-ui, sans-serif; background: #faf3df; color: #3a2010; padding: 32px; }}
-h1 {{ font-size: 30.8px; margin: 0 0 8px; }}
-.sub {{ color: #6a4828; margin-bottom: 24px; }}
-ul {{ list-style: none; padding: 0; }}
-li {{ padding: 14px 18px; background: #fff; border: 2px solid #3a2010; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 3px 0 #3a2010; }}
-a {{ color: #c44a2a; text-decoration: none; }}
-a:hover {{ text-decoration: underline; }}
-.theme {{ font-size: 13.2px; padding: 2px 8px; background: #ffd9b8; border-radius: 10px; }}
-</style></head>
-<body>
-<h1>Quest Dashboard</h1>
-<p class="sub">All projects at a glance. Source of truth: <code>~/.claude/quest/data/quests.json</code></p>
-<ul>
-{chr(10).join(rows)}
-</ul>
-</body></html>
-"""
+        xp_max = xp.get("max", 100) or 100
+        xp_pct = int(100 * xp.get("current", 0) / xp_max)
+
+        # Accent + icon: project-declared field wins, then per-pid default,
+        # else rotate through palette / icon list by index.
+        accent = p.get("accent") or DEFAULT_ACCENTS.get(pid) or ACCENT_PALETTE[(n - 1) % len(ACCENT_PALETTE)]
+        icon_kind = p.get("icon") or DEFAULT_ICONS.get(pid) or ICON_ROTATION[(n - 1) % len(ICON_ROTATION)]
+        grass_dark = accent
+        grass_light = lighten(accent, 0.55)
+
+        # Borrow the icon from the project's own theme; fall back to pokemon
+        # so the global index always renders even if a custom theme lacks it.
+        icon_svg = load_landmark(theme, icon_kind)
+        if icon_svg.startswith("<!-- missing landmark"):
+            icon_svg = load_landmark("pokemon", icon_kind)
+
+        active_label = f"#{active.get('n','?')} {active.get('name','?')}" if active else ""
+
+        projects_list.append({
+            "id": pid,
+            "n": n,
+            "name": p.get("name", pid),
+            "subtitle": p.get("subtitle") or "—",
+            "level": p.get("level", 1),
+            "xp_current": xp.get("current", 0),
+            "xp_max": xp_max,
+            "xp_pct": xp_pct,
+            "theme": theme,
+            "theme_label": "Storybook" if theme == "storybook" else "Pokémon",
+            "strip_class": "storybook" if theme == "storybook" else "",
+            "counts": counts,
+            "has_active": active is not None,
+            "no_active": active is None,
+            "active_label": active_label,
+            "accent": accent,
+            "grass_dark": grass_dark,
+            "grass_light": grass_light,
+            "icon_kind": icon_kind,
+            "icon_svg": icon_svg,
+            "route_href": f"{pid}/route.html",
+            "log_href": f"{pid}/quest-log.html",
+        })
+
+    return {"projects_list": projects_list, "totals": totals}
+
+
+def render_global_index(data: dict) -> str:
+    """Render the home page (Trainer Hall layout) — replaces the prior bullet list."""
+    template_path = THEMES / "_shared" / "global-index.html.tmpl"
+    if not template_path.exists():
+        return f"<!-- missing template: {template_path} -->"
+    template = template_path.read_text(encoding="utf-8")
+    scope = precompute_global_index(data)
+    # Theme arg controls partial resolution; this template doesn't use partials.
+    return _render(template, scope, "pokemon")
 
 
 def render_all() -> int:

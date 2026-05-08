@@ -29,13 +29,20 @@
   .filt.on { background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 3px 0 #5a1818; }
   .filt .count { display: inline-block; margin-left: 4px; padding: 1px 6px; background: rgba(0,0,0,0.12); border-radius: 8px; font-size: 11px; }
   .filt.on .count { background: rgba(255,255,255,0.25); }
-  /* Status-based filtering — body[data-filter] toggled by JS */
-  body[data-filter="active"]  .card.done,    body[data-filter="active"]  .card.locked  { display: none; }
-  body[data-filter="visited"] .card.current, body[data-filter="visited"] .card.locked  { display: none; }
-  body[data-filter="sealed"]  .card.current, body[data-filter="sealed"]  .card.done    { display: none; }
+  /* Multi-select status filter — body classes toggled by JS, persisted in localStorage */
+  body.hide-current .card.current { display: none; }
+  body.hide-done    .card.done    { display: none; }
+  body.hide-locked  .card.locked  { display: none; }
   .filt.on { background: #2a3a4a; color: #ffd24a; }
   .filt .count { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 12.1px; }
   .filt.on .count { background: #ffd24a; color: #2a3a4a; }
+  /* Off-state pills look "scrolled-up", muted but still readable */
+  .filt[data-status] .icon { display: inline-block; margin-right: 4px; opacity: 0.85; }
+  .filt[data-status]:not(.on) { background: #f0e4cc; color: #8a8a8a; border-style: dashed; box-shadow: none; opacity: 0.7; }
+  .filt[data-status]:not(.on) .icon { opacity: 0.4; }
+  .filt-sep { color: #8a7a6a; padding: 0 2px; user-select: none; align-self: center; }
+  .filt-action { font-size: 11px; padding: 5px 10px; background: #fffdf2; }
+  .filt-action:hover { background: #f7eed8; }
   .grid { padding: 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; background: #fffdf2; }
   .card { background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 14px; overflow: hidden; box-shadow: 0 5px 0 #2a3a4a; transition: transform .15s; cursor: pointer; }
   .card:hover { transform: translateY(-3px); }
@@ -72,6 +79,8 @@
   .card.done .row-done { display: flex; }
   .card.current .row-current { display: block; }
   .card.locked .row-locked { display: flex; }
+  .qd-dep-blocked { padding: 6px 10px; margin-top: 6px; background: #f7eed8; border: 2px dashed #c0a878; border-radius: 6px; font-size: 12.1px; font-weight: 600; color: #6a4828; }
+  .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; }
 </style>
 </head>
 <body>
@@ -94,11 +103,13 @@
     </div>
   </header>
 
-  <div class="filters" role="tablist" aria-label="Filter quests by status">
-    <button class="filt on" type="button" data-filter="all" role="tab" aria-selected="true">All <span class="count">{{counts.total}}</span></button>
-    <button class="filt" type="button" data-filter="active" role="tab" aria-selected="false">Active <span class="count">{{counts.current}}</span></button>
-    <button class="filt" type="button" data-filter="visited" role="tab" aria-selected="false">Visited <span class="count">{{counts.done}}</span></button>
-    <button class="filt" type="button" data-filter="sealed" role="tab" aria-selected="false">Sealed <span class="count">{{counts.locked}}</span></button>
+  <div class="filters" role="group" aria-label="Filter quests by status (multi-select)">
+    <button class="filt on" type="button" data-status="current" aria-pressed="true" title="Show in-progress quests"><span class="icon">⚔</span>Active <span class="count">{{counts.current}}</span></button>
+    <button class="filt on" type="button" data-status="done" aria-pressed="true" title="Show completed quests"><span class="icon">★</span>Visited <span class="count">{{counts.done}}</span></button>
+    <button class="filt on" type="button" data-status="locked" aria-pressed="true" title="Show locked quests"><span class="icon">🔒</span>Sealed <span class="count">{{counts.locked}}</span></button>
+    <span class="filt-sep" aria-hidden="true">·</span>
+    <button class="filt filt-action" type="button" data-action="show-all" title="Reveal all statuses">Show All</button>
+    <button class="filt filt-action" type="button" data-action="active-only" title="In-progress only">Active Only</button>
   </div>
 
   <div class="grid">
@@ -133,6 +144,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
           Awaits the next deed
         </div>
+        {{#if q.depends_on_str}}
+        <div class="qd-dep-blocked">After: {{q.depends_on_str}}</div>
+        {{/if}}
       </div>
     </a>
     {{/each}}
@@ -140,29 +154,45 @@
 </div>
 <script>
 (function() {
-  var VALID = ['all', 'active', 'visited', 'sealed'];
-  var btns = document.querySelectorAll('.filt');
-  function setFilter(name) {
-    if (VALID.indexOf(name) === -1) name = 'all';
-    document.body.setAttribute('data-filter', name);
-    btns.forEach(function(b) {
-      var on = b.dataset.filter === name;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    if (name === 'all') {
-      history.replaceState(null, '', location.pathname + location.search);
-    } else if (location.hash !== '#' + name) {
-      history.replaceState(null, '', location.pathname + location.search + '#' + name);
-    }
+  // Per-project storage key — pathname segment 1 is the project id
+  var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
+  var KEY = 'qd-filter-' + pid;
+  var STATUSES = ['current', 'done', 'locked'];
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
   }
-  btns.forEach(function(b) {
-    b.addEventListener('click', function() { setFilter(b.dataset.filter); });
+  function save(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var state = load();
+  if (!Array.isArray(state.show)) state.show = STATUSES.slice();  // default: all visible
+  function apply() {
+    STATUSES.forEach(function(s) {
+      document.body.classList.toggle('hide-' + s, state.show.indexOf(s) === -1);
+    });
+    document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+      var on = state.show.indexOf(b.dataset.status) !== -1;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var k = b.dataset.status;
+      var i = state.show.indexOf(k);
+      if (i === -1) state.show.push(k); else state.show.splice(i, 1);
+      save(state); apply();
+    });
   });
-  // Initial state from URL hash, fallback to 'all'
-  setFilter((location.hash || '').slice(1) || 'all');
-  // Respond to back/forward
-  window.addEventListener('hashchange', function() { setFilter((location.hash || '').slice(1) || 'all'); });
+  document.querySelectorAll('.filt[data-action]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var act = b.dataset.action;
+      if (act === 'show-all') state.show = STATUSES.slice();
+      else if (act === 'active-only') state.show = ['current'];
+      save(state); apply();
+    });
+  });
+  apply();
 })();
 </script>
 </body>

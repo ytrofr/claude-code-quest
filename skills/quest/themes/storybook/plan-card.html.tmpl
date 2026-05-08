@@ -66,6 +66,18 @@
   .qd-tasks-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .qd-tasks-title { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 13.2px; letter-spacing: 3px; color: #c44a2a; text-transform: uppercase; }
   .qd-tasks-count { font-family: 'Eczar', serif; font-weight: 700; font-size: 14.3px; color: #c44a2a; }
+  .qd-deeds-toggle { margin-left: auto; padding: 4px 12px; background: #fbf3df; border: 2px solid #4a2e1a; font-family: 'Eczar', serif; font-weight: 700; font-size: 11.5px; color: #4a2e1a; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .qd-deeds-toggle:hover { background: #f3e6c4; }
+  .qd-deeds-toggle:focus-visible { outline: 2px solid #c44a2a; outline-offset: 2px; }
+  .qd-deeds-toggle.on { background: #c44a2a; color: #fbf3df; border-color: #4a2e1a; }
+  .qd-toggle-mark { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; text-align: center; font-weight: 800; line-height: 10px; font-size: 11px; }
+  .qd-deeds-toggle.on .qd-toggle-mark::before { content: '✓'; }
+  body.hide-done-deeds .qd-task.qd-task-done { display: none; }
+  /* Storyline link styles + plan-file chips */
+  .qd-storyline-link { color: #c44a2a; font-weight: 700; text-decoration: none; border-bottom: 1px dotted #c44a2a; }
+  .qd-storyline-link:hover { background: #f3e6c4; border-bottom-style: solid; }
+  .qd-storyline-arrow { color: #c44a2a; font-weight: 800; }
+  .qd-plan-chip { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; background: #fbf3df; border: 1px solid #8a6f4a; font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: #4a2e1a; }
   .qd-tasks-list { list-style: none; padding: 0; margin: 0; }
   .qd-task { padding: 6px 0; font-family: 'Eczar', serif; font-size: 15.4px; border-bottom: 1px dotted rgba(138,111,74,0.3); }
   .qd-task:last-child { border-bottom: none; }
@@ -168,6 +180,7 @@
       <div class="chapter-mark">— Chapter the {{active.n}} —</div>
       <h2>{{active.name}}</h2>
       <p class="epigraph">{{active.desc}}</p>
+      {{> _problem-solution}}
       {{> _why}}
       {{> _pills}}
       <div class="ornament">❦ ⁂ ❦</div>
@@ -193,5 +206,33 @@
     </div>
   </div>
 </div>
+<script>
+(function() {
+  var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
+  var KEY = 'qd-filter-' + pid;
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+  }
+  function save(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var state = load();
+  var btn = document.querySelector('.qd-deeds-toggle');
+  function apply() {
+    document.body.classList.toggle('hide-done-deeds', !!state.hideDoneDeeds);
+    if (btn) {
+      btn.classList.toggle('on', !!state.hideDoneDeeds);
+      btn.setAttribute('aria-pressed', state.hideDoneDeeds ? 'true' : 'false');
+    }
+  }
+  if (btn) {
+    btn.addEventListener('click', function() {
+      state.hideDoneDeeds = !state.hideDoneDeeds;
+      save(state); apply();
+    });
+  }
+  apply();
+})();
+</script>
 </body>
 </html>

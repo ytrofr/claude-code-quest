@@ -65,10 +65,16 @@
   .filt.on { background: #c44a2a; color: #fbf3df; border-color: #4a2e1a; }
   .filt .count { display: inline-block; margin-left: 5px; padding: 0 6px; background: rgba(0,0,0,0.12); font-size: 11px; font-style: italic; }
   .filt.on .count { background: rgba(255,255,255,0.25); }
-  /* Status-based filtering */
-  body[data-filter="active"]  .row.done,    body[data-filter="active"]  .row.locked  { display: none; }
-  body[data-filter="visited"] .row.current, body[data-filter="visited"] .row.locked  { display: none; }
-  body[data-filter="sealed"]  .row.current, body[data-filter="sealed"]  .row.done    { display: none; }
+  /* Multi-select status filter — body classes toggled by JS, persisted in localStorage */
+  body.hide-current .row.current { display: none; }
+  body.hide-done    .row.done    { display: none; }
+  body.hide-locked  .row.locked  { display: none; }
+  .filt[data-status]:not(.on) { background: #ede0c0; color: #8a7a6a; border-style: dashed; opacity: 0.7; }
+  .filt-sep { color: #8a6f4a; padding: 0 4px; align-self: center; user-select: none; }
+  .filt-action { font-size: 11.5px; padding: 4px 12px; background: #fbf3df; }
+  .filt-action:hover { background: #f3e6c4; }
+  .qd-dep-blocked { padding: 5px 10px; margin-top: 6px; background: #ede0c0; border: 1px dashed #8a6f4a; border-radius: 4px; font-family: 'Eczar', serif; font-style: italic; font-size: 13.2px; color: #6a4a30; }
+  .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; font-style: normal; }
 </style>
 </head>
 <body>
@@ -100,11 +106,13 @@
     <p class="toc-sub">a complete index, with notations on those completed, present, and yet to come</p>
     <div class="ornament">❦ ⁂ ❦</div>
 
-    <div class="filters" role="tablist" aria-label="Filter chapters by status">
-      <button class="filt on" type="button" data-filter="all" role="tab" aria-selected="true">All <span class="count">{{counts.total}}</span></button>
-      <button class="filt" type="button" data-filter="active" role="tab" aria-selected="false">Reading <span class="count">{{counts.current}}</span></button>
-      <button class="filt" type="button" data-filter="visited" role="tab" aria-selected="false">Read <span class="count">{{counts.done}}</span></button>
-      <button class="filt" type="button" data-filter="sealed" role="tab" aria-selected="false">Sealed <span class="count">{{counts.locked}}</span></button>
+    <div class="filters" role="group" aria-label="Filter chapters by status (multi-select)">
+      <button class="filt on" type="button" data-status="current" aria-pressed="true">Reading <span class="count">{{counts.current}}</span></button>
+      <button class="filt on" type="button" data-status="done" aria-pressed="true">Read <span class="count">{{counts.done}}</span></button>
+      <button class="filt on" type="button" data-status="locked" aria-pressed="true">Sealed <span class="count">{{counts.locked}}</span></button>
+      <span class="filt-sep" aria-hidden="true">·</span>
+      <button class="filt filt-action" type="button" data-action="show-all">Show All</button>
+      <button class="filt filt-action" type="button" data-action="active-only">Reading Only</button>
     </div>
 
     <div class="toc">
@@ -128,6 +136,9 @@
             <span class="stamp">{{q.status_class}}</span>
             <span>+{{q.xp_reward}} leagues</span>
           </div>
+          {{#if q.depends_on_str}}
+          <div class="qd-dep-blocked">After: {{q.depends_on_str}}</div>
+          {{/if}}
         </div>
         <div class="right-tag">+{{q.xp_reward}}</div>
       </a>
@@ -139,27 +150,44 @@
 </div>
 <script>
 (function() {
-  var VALID = ['all', 'active', 'visited', 'sealed'];
-  var btns = document.querySelectorAll('.filt');
-  function setFilter(name) {
-    if (VALID.indexOf(name) === -1) name = 'all';
-    document.body.setAttribute('data-filter', name);
-    btns.forEach(function(b) {
-      var on = b.dataset.filter === name;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    if (name === 'all') {
-      history.replaceState(null, '', location.pathname + location.search);
-    } else if (location.hash !== '#' + name) {
-      history.replaceState(null, '', location.pathname + location.search + '#' + name);
-    }
+  var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
+  var KEY = 'qd-filter-' + pid;
+  var STATUSES = ['current', 'done', 'locked'];
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
   }
-  btns.forEach(function(b) {
-    b.addEventListener('click', function() { setFilter(b.dataset.filter); });
+  function save(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var state = load();
+  if (!Array.isArray(state.show)) state.show = STATUSES.slice();
+  function apply() {
+    STATUSES.forEach(function(s) {
+      document.body.classList.toggle('hide-' + s, state.show.indexOf(s) === -1);
+    });
+    document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+      var on = state.show.indexOf(b.dataset.status) !== -1;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var k = b.dataset.status;
+      var i = state.show.indexOf(k);
+      if (i === -1) state.show.push(k); else state.show.splice(i, 1);
+      save(state); apply();
+    });
   });
-  setFilter((location.hash || '').slice(1) || 'all');
-  window.addEventListener('hashchange', function() { setFilter((location.hash || '').slice(1) || 'all'); });
+  document.querySelectorAll('.filt[data-action]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var act = b.dataset.action;
+      if (act === 'show-all') state.show = STATUSES.slice();
+      else if (act === 'active-only') state.show = ['current'];
+      save(state); apply();
+    });
+  });
+  apply();
 })();
 </script>
 </body>

@@ -106,6 +106,78 @@ def detect_project(plan_path: Path) -> str | None:
 
 _BOX_LINE = re.compile(r"^([ \t>*-]*)\[([ xX])\]\s+(.+?)$", re.MULTILINE)
 _SUBBULLET = re.compile(r"^[ \t]+[-*+]\s+(.+?)$")
+# BLUF Problem/Solution lines — tolerate `> `, `- `, `* ` markdown prefixes.
+_BLUF_PROBLEM = re.compile(r"^[\s>*\-]*\*\*Problem\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
+_BLUF_SOLUTION = re.compile(r"^[\s>*\-]*\*\*Solution\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
+# `depends_on:` directive (anywhere in plan): `> **Depends on**: quest-id-1, quest-id-2`
+_BLUF_DEPENDS = re.compile(r"^[\s>*\-]*\*\*Depends[- ]on\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
+# `Why:` line (motivation in 1 sentence)
+_BLUF_WHY = re.compile(r"^[\s>*\-]*\*\*Why\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
+
+
+def _trim_sentence(text: str, cap: int = 140) -> str:
+    """Cap text to first sentence OR `cap` chars, whichever is shorter.
+
+    Preserves natural break (. ! ?) when the sentence ends within cap+20 chars.
+    Never returns >cap chars; trailing ellipsis added when truncating mid-word."""
+    if not text:
+        return ""
+    text = text.strip().rstrip(" .,;:")
+    # Try to break on first sentence end within cap+20 (small overflow OK)
+    m = re.search(r"^(.{15,%d}?[.!?])\s" % (cap + 20), text)
+    if m:
+        return m.group(1).strip()
+    if len(text) <= cap:
+        return text
+    # Hard truncate at last word boundary before cap-3 (room for ellipsis)
+    cut = text[: cap - 1]
+    cut = cut.rsplit(" ", 1)[0] if " " in cut else cut
+    return cut + "…"
+
+
+def extract_bluf(text: str) -> dict:
+    """Pull Problem/Solution/Why/Depends-on from BLUF block. All optional.
+
+    Returns {problem?, solution?, why?, depends_on?}. Caps each at 200 chars
+    (leaner display); empty strings stripped."""
+    out: dict = {}
+    if not text:
+        return out
+    pm = _BLUF_PROBLEM.search(text)
+    if pm:
+        v = pm.group(1).strip()[:200]
+        if v:
+            out["problem"] = v
+    sm = _BLUF_SOLUTION.search(text)
+    if sm:
+        v = sm.group(1).strip()[:200]
+        if v:
+            out["solution"] = v
+    wm = _BLUF_WHY.search(text)
+    if wm:
+        v = wm.group(1).strip()[:200]
+        if v:
+            out["why"] = v
+    dm = _BLUF_DEPENDS.search(text)
+    if dm:
+        deps = [d.strip().strip("`\"' ").lower() for d in dm.group(1).split(",")]
+        deps = [d for d in deps if d and re.match(r"^[\w\-]+$", d)]
+        if deps:
+            out["depends_on"] = deps
+    return out
+
+
+def derive_lean_desc(text: str) -> str:
+    """Return one-liner desc (≤140 chars). Prefers BLUF Solution, falls back to H1."""
+    bluf = extract_bluf(text)
+    sol = bluf.get("solution") or ""
+    if sol:
+        return _trim_sentence(sol, 140)
+    # H1 fallback (first `# ...` line)
+    m = re.search(r"^#\s+(.+)", text, re.MULTILINE)
+    if m:
+        return _trim_sentence(m.group(1), 140)
+    return ""
 
 
 def parse_plan_progress(plan_text: str) -> dict:
@@ -236,30 +308,17 @@ def get_git_meta(plan_path: Path) -> dict:
 
 
 def derive_quest(plan_path: Path, n: int) -> dict:
-    """Build a quest dict from a plan file."""
+    """Build a quest dict from a plan file. Lean desc (≤140 char) +
+    problem/solution/why/depends_on lifted from BLUF when present."""
     name = plan_path.stem
     # Strip leading "1-" / "2026-05-07-" style prefixes for display
     display_name = re.sub(r"^\d+[-_]", "", name).replace("-", " ").replace("_", " ").title()
 
-    # Try to extract description from first H1 or BLUF Solution line
-    desc = ""
-    try:
-        text = plan_path.read_text(encoding="utf-8", errors="ignore")
-        m = re.search(r"\*\*Solution\*\*\s*:\s*(.+)", text)
-        if m:
-            desc = m.group(1).strip()[:200]
-        else:
-            m = re.search(r"^#\s+(.+)", text, re.MULTILINE)
-            if m:
-                desc = m.group(1).strip()[:200]
-    except Exception:
-        pass
-
-    return {
+    quest = {
         "id": slug(name),
         "n": n,
         "name": display_name,
-        "desc": desc,
+        "desc": "",
         "landmark": LANDMARKS[(n - 1) % len(LANDMARKS)],
         "status": "locked",  # caller decides current vs locked
         "progress": 0.0,
@@ -267,6 +326,18 @@ def derive_quest(plan_path: Path, n: int) -> dict:
         "plan": plan_path.name,
         "next_step": "",
     }
+
+    try:
+        text = plan_path.read_text(encoding="utf-8", errors="ignore")
+        quest["desc"] = derive_lean_desc(text)
+        bluf = extract_bluf(text)
+        for k in ("problem", "solution", "why", "depends_on"):
+            if k in bluf:
+                quest[k] = bluf[k]
+    except Exception as e:
+        log_msg(f"WARN derive_quest: {e}")
+
+    return quest
 
 
 def render_now() -> None:
@@ -277,11 +348,15 @@ def render_now() -> None:
 
 
 def update_existing_quest(quest: dict, plan_path: Path) -> dict:
-    """Refresh tasks, progress, last_touched, branch, last_commit from plan
-    content + git. Returns dict of {field: change} for logging. Mutates quest.
+    """Refresh tasks, progress, last_touched, branch, last_commit, BLUF fields
+    from plan content + git. Returns dict of {field: change} for logging.
+    Mutates quest.
 
     Conservative: never overwrites with empty/None. Manual /quest update wins
-    if user has set values that the parser can't infer."""
+    if user has set values that the parser can't infer.
+
+    Desc self-heals only when stored value is empty OR longer than 140 chars
+    (prevents clobbering hand-set lean descriptions)."""
     changes = {}
     try:
         text = plan_path.read_text(encoding="utf-8", errors="ignore")
@@ -301,6 +376,21 @@ def update_existing_quest(quest: dict, plan_path: Path) -> dict:
             quest["progress"] = parsed["progress"]
             changes["progress"] = f"{old_progress:.2f}→{parsed['progress']:.2f}"
 
+    # BLUF refresh: problem, solution, why, depends_on always update from plan.
+    bluf = extract_bluf(text)
+    for k in ("problem", "solution", "why", "depends_on"):
+        if k in bluf and quest.get(k) != bluf[k]:
+            quest[k] = bluf[k]
+            changes[k] = "refreshed"
+
+    # Desc self-heal: replace empty OR fat (>140) desc with lean version.
+    desc_now = quest.get("desc") or ""
+    if not desc_now or len(desc_now) > 140:
+        lean = derive_lean_desc(text)
+        if lean and lean != desc_now:
+            quest["desc"] = lean
+            changes["desc"] = f"{len(desc_now)}→{len(lean)} chars"
+
     git_meta = get_git_meta(plan_path)
     for k, v in git_meta.items():
         if v and quest.get(k) != v:
@@ -314,6 +404,47 @@ def update_existing_quest(quest: dict, plan_path: Path) -> dict:
         changes["last_touched"] = new_ts
 
     return changes
+
+
+def detect_depends_hint(plan_text: str, plan_path: Path, project: dict, new_quest_id: str) -> list[str]:
+    """Heuristic: scan project's existing current/locked quests for ones the new
+    plan likely depends on. Return list of likely-parent quest ids.
+
+    Triggers:
+      - Plan body mentions an existing quest id verbatim (e.g. 'after `setup-quest`')
+      - Plan body mentions an existing quest name (case-insensitive substring)
+    Skips:
+      - Self-reference (the new quest's own id/name)
+      - Quests already cited in BLUF Depends-on (no false-positive nag)
+    Returns empty list if no hints found."""
+    bluf = extract_bluf(plan_text)
+    already = set(bluf.get("depends_on") or [])
+
+    # Strip BLUF block to avoid matching the plan's own front-matter
+    body = plan_text
+    bluf_match = re.search(r"^##\s+BLUF\b.*?(?=^##\s)", plan_text, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+    if bluf_match:
+        body = plan_text[:bluf_match.start()] + plan_text[bluf_match.end():]
+    body_lower = body.lower()
+
+    hints: list[str] = []
+    for q in project.get("quests", []):
+        qid = q.get("id", "")
+        qname = q.get("name", "")
+        if not qid or qid == new_quest_id or qid in already:
+            continue
+        # Match on:
+        #  - backticked id (most precise): `qid`
+        #  - bare id with word boundaries (kebab-case is rare in prose)
+        #  - full quest name case-insensitive substring (≥4 chars to avoid common words)
+        id_re = re.compile(rf"(?<![\w-]){re.escape(qid)}(?![\w-])")
+        if (
+            (f"`{qid}`" in body_lower)
+            or id_re.search(body_lower)
+            or (len(qname) >= 4 and qname.lower() in body_lower)
+        ):
+            hints.append(qid)
+    return hints
 
 
 def autosync(plan_path: Path) -> None:
@@ -376,6 +507,17 @@ def autosync(plan_path: Path) -> None:
 
     # Initial parse of plan content + git meta
     update_existing_quest(quest, plan_path)
+
+    # Soft hint — does this plan look like it depends on an existing quest?
+    # Logged only; never auto-writes (user-controlled signal).
+    try:
+        plan_text_for_hints = plan_path.read_text(encoding="utf-8", errors="ignore")
+        hints = detect_depends_hint(plan_text_for_hints, plan_path, project, quest["id"])
+        if hints:
+            log_msg(f"HINT {project_id}/{quest['id']}: plan mentions existing quest(s) {hints} — "
+                    f"add `> **Depends on**: {','.join(hints)}` to BLUF if sequential")
+    except Exception as e:
+        log_msg(f"WARN depends hint: {e}")
 
     project["quests"].append(quest)
 
