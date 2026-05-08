@@ -140,6 +140,17 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
         # next_step shown only if non-empty + status==current
         q["has_next"] = bool(q.get("next_step")) and q.get("status") == "current"
 
+        # Auto-size the quest label rect/path so long names don't overflow.
+        # Width formula: max(80, char_count * 7 + 18). The +8 buffer covers
+        # the "{n} · " or "{roman} · " prefix that varies between themes.
+        name_chars = len(q.get("name", "")) + 8
+        label_w = max(80, name_chars * 7 + 18)
+        q["label_width"] = label_w
+        q["label_x"] = -label_w // 2
+        # For storybook's trapezoid label, inner-edge inset (creates lean shape).
+        q["label_half"] = label_w // 2
+        q["label_half_inner"] = max(label_w // 2 - 6, 6)
+
         # v2 schema derivations (all optional; absent fields stay absent)
         tasks = q.get("tasks", [])
         if tasks:
