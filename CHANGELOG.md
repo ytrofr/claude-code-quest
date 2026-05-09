@@ -2,6 +2,19 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.6.1] — 2026-05-09
+
+Plan-card readability + ergonomics polish.
+
+### Added
+
+- **`/quest update --problem` and `--solution`** flags. Authors plain-language Problem/Solution lines on a quest without hand-editing JSON. Encourages human-friendly summaries on the plan card even when the underlying plan's BLUF is dense engineering speak.
+- **"Hide done" toggle** in the Claude Actions header. One-click filter that collapses every `[done]` action row in both the expanded list and the next-3 peek. State persists per-quest in localStorage (`qd-hide-done-<pid>-<qid>-cc`). Click stops propagation so it doesn't fight the section's collapse arrow.
+
+### Changed
+
+- **Font sizes normalized** across both themes. Removed 23 distinct fractional values (`12.1px`, `13.2px`, `14.3px`, `15.4px`, `16.5px`, `17.6px`, `19.8px`, `26.4px`, `28.6px`, `35.2px`, `39.6px`, `70.4px`, …) — all rounded to a clean integer scale: 10/11/12/13/14/15/16/18/19/20/21/22/24/26/28/30/32/36/64. Fixes type rhythm across plan-card, route, quest-log, and global-index in both pokemon and storybook themes.
+
 ## [1.6.0] — 2026-05-09
 
 Major release: every plan-card now has the rich "Your Actions / Claude's Actions" coordination surface, the engine supports multiple active quests per project, and CC sessions get a clickable hyperlink to their current quest in the statusline.
