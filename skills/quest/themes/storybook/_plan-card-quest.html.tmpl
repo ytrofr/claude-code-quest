@@ -1,0 +1,97 @@
+<!-- Per-quest body block for storybook plan-card. Rendered N times by render.py. -->
+<div class="frame">
+  <header class="head">
+    <div class="title-row">
+      <svg class="crest" viewBox="0 0 56 56">
+        <path d="M 28 4 L 50 14 V 30 Q 50 46 28 52 Q 6 46 6 30 V 14 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2.5"/>
+        <path d="M 28 12 L 42 18 V 30 Q 42 40 28 44 Q 14 40 14 30 V 18 Z" fill="#c89030" stroke="#4a2e1a" stroke-width="1.5"/>
+        <text x="28" y="32" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="16" fill="#fbf3df">{{level_roman}}</text>
+      </svg>
+      <div>
+        <h1>The Tale of {{name}}</h1>
+        <div class="sub">Chapter {{active.n}} · folio xii</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="route.html">MAP</a>
+      <a href="quest-log.html">CHAPTERS</a>
+    </nav>
+  </header>
+
+  <div class="crumbs">
+    {{> _back-link}}
+    <span>·</span>
+    <a href="quest-log.html">Chapters</a>
+    <span>·</span>
+    <span class="here">Chapter {{active.n}} — {{active.name}}</span>
+  </div>
+
+  <div class="spread">
+    <div class="left-page">
+      <div class="illus-frame">
+        <svg viewBox="0 0 540 460" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="sky-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#fbe8c4"/><stop offset="100%" stop-color="#e8d4a0"/></radialGradient>
+            <radialGradient id="mtn-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#c8b09a"/><stop offset="100%" stop-color="#7a5a40"/></radialGradient>
+          </defs>
+          <rect width="540" height="460" fill="url(#sky-grad-c)"/>
+          <ellipse cx="270" cy="280" rx="220" ry="80" fill="#c8b08a" opacity="0.4"/>
+          <polygon points="180,300 250,140 320,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
+          <polygon points="220,250 250,210 280,250" fill="#fff" opacity="0.6"/>
+          <polygon points="280,300 350,160 420,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
+          <g transform="translate(270,330) scale(2.2)">{{{active.landmark_svg}}}</g>
+          <g class="twinkle">
+            <polygon points="180,180 184,170 192,168 184,166 180,156 176,166 168,168 176,170" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
+            <polygon points="380,200 384,190 392,188 384,186 380,176 376,186 368,188 376,190" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
+          </g>
+        </svg>
+      </div>
+      <p class="illus-cap">— Plate {{active.n}} — {{active.name}}, drawn from the operator's own hand.</p>
+
+      <div class="illus-stats">
+        <div class="h">— Of This Endeavour —</div>
+        <div class="row"><span class="lbl">Reward</span><span class="val">+{{active.xp_reward}} leagues</span></div>
+        <div class="row"><span class="lbl">Progress</span><span class="val">{{active_progress_pct}}%</span></div>
+        <div class="row"><span class="lbl">Region</span><span class="val">Lvl {{level_roman}}</span></div>
+        <div class="row"><span class="lbl">Of total</span><span class="val">Chapter {{active.n}} of {{counts.total}}</span></div>
+      </div>
+    </div>
+
+    <div class="right-page">
+      <div class="chapter-mark">— Chapter the {{active.n}} —</div>
+      <h2>{{active.display_name}}</h2>
+      <p class="epigraph">{{active.desc}}</p>
+      {{> _problem-solution}}
+      {{> _why}}
+      {{> _pills}}
+      <div class="ornament">❦ ⁂ ❦</div>
+
+      <div class="narrative">
+        <p><span class="drop-cap">L</span>ONG had the operator pursued this endeavour through its many forms. The chronicle recorded here is a faithful accounting of the deeds undertaken and yet to come.</p>
+        <blockquote class="pull">"{{active.next_step}}"</blockquote>
+        <p>Once accomplished, further chapters unseal — and the operator advances toward the great Lvl {{level_roman}}+1.</p>
+      </div>
+
+      {{> _actions-user}}
+
+      {{> _actions-claude}}
+
+      {{> _taskslist}}
+
+      {{> _user-tasks}}
+
+      {{> _next-step}}
+
+      {{> _links}}
+
+      {{> _meta-row}}
+
+      <p class="margin"><span class="qd-meta-icon">{{> icons/plan-file}}</span> Charter: <code>~/.claude/plans/{{active.plan}}</code></p>
+
+      <div class="actions">
+        <a class="btn primary" href="#">Resume the Quest</a>
+        <a class="btn ghost" href="quest-log.html">To Chapters</a>
+      </div>
+    </div>
+  </div>
+</div>

@@ -106,6 +106,22 @@ def detect_project(plan_path: Path) -> str | None:
 
 _BOX_LINE = re.compile(r"^([ \t>*-]*)\[([ xX])\]\s+(.+?)$", re.MULTILINE)
 _SUBBULLET = re.compile(r"^[ \t]+[-*+]\s+(.+?)$")
+# Markdown-style links: [label](https://url)  — captures label + url separately.
+_MD_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+# Bare URLs (anywhere). Excludes trailing punctuation typical in prose.
+_BARE_URL = re.compile(r"(?<![\(\[\"'`])https?://[^\s)\]\"'`]+[^\s)\]\"'`.,;:]")
+# `## Links` / `## Useful links` / `## Relevant links` heading + body until
+# next `## ` heading (or EOF). Case-insensitive.
+_LINKS_SECTION = re.compile(
+    r"^##+\s+(?:useful\s+|relevant\s+|see\s+also|reference\s+)?links?\b.*?$"
+    r"(.*?)(?=^##\s|\Z)",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
+)
+# Section 0.1 (Pre-Validation Probe) — sometimes carries dashboard URLs.
+_SEC_01 = re.compile(
+    r"^##\s+Section\s+0\.1\b.*?(?=^##\s+(?:Section|\d)|\Z)",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
+)
 # BLUF Problem/Solution lines — tolerate `> `, `- `, `* ` markdown prefixes.
 _BLUF_PROBLEM = re.compile(r"^[\s>*\-]*\*\*Problem\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
 _BLUF_SOLUTION = re.compile(r"^[\s>*\-]*\*\*Solution\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
@@ -113,6 +129,53 @@ _BLUF_SOLUTION = re.compile(r"^[\s>*\-]*\*\*Solution\*\*\s*:\s*(.+?)$", re.MULTI
 _BLUF_DEPENDS = re.compile(r"^[\s>*\-]*\*\*Depends[- ]on\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
 # `Why:` line (motivation in 1 sentence)
 _BLUF_WHY = re.compile(r"^[\s>*\-]*\*\*Why\*\*\s*:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
+
+# Action item heading: `### 1. Title text [STATUS]` (status optional).
+# - Number prefix optional but recommended (auto-numbered if absent).
+# - [STATUS] in brackets at end of line (any text — render.py maps to color class).
+# - Body is everything until the next `### ` or `## ` heading.
+_ACTION_HEAD = re.compile(
+    r"^###\s+(?:(\d+)\.\s+)?(.+?)(?:\s+\[([A-Z][A-Z0-9 \-_]*)\])?\s*$",
+    re.MULTILINE,
+)
+
+# Status keyword → color bucket. Render.py uses the bucket as a CSS class.
+# Free-form keywords map by substring match (case-insensitive); unknown → "default".
+STATUS_BUCKETS = {
+    "todo":       ("TODO", "todo"),
+    "done":       ("DONE", "done"),
+    "complete":   ("DONE", "done"),
+    "completed":  ("DONE", "done"),
+    "waiting":    ("WAITING", "waiting"),
+    "blocked":    ("WAITING", "waiting"),
+    "queued":     ("QUEUED", "queued"),
+    "after":      ("QUEUED", "queued"),     # AFTER 24H, AFTER REVIEW, etc.
+    "on":         ("QUEUED", "queued"),     # ON GREENLIGHT, ON APPROVAL
+    "continuous": ("CONTINUOUS", "continuous"),
+    "ongoing":    ("CONTINUOUS", "continuous"),
+}
+
+
+def status_to_class(status: str) -> tuple[str, str]:
+    """Return (display_text, css_class) for a status keyword. Unknown → ('', 'default').
+
+    display_text is the original status verbatim (uppercased), preserving multi-word
+    phrases like 'AFTER 24H' or 'ON GREENLIGHT'. css_class is one of:
+    todo, done, waiting, queued, continuous, default."""
+    if not status:
+        return ("", "default")
+    s = status.strip().upper()
+    low = s.lower()
+    # Direct match first
+    if low in STATUS_BUCKETS:
+        _, css = STATUS_BUCKETS[low]
+        return (s, css)
+    # First-word match (catches "AFTER 24H" → after, "ON GREENLIGHT" → on)
+    first = low.split()[0] if low else ""
+    if first in STATUS_BUCKETS:
+        _, css = STATUS_BUCKETS[first]
+        return (s, css)
+    return (s, "default")
 
 
 def _trim_sentence(text: str, cap: int = 140) -> str:
@@ -178,6 +241,249 @@ def derive_lean_desc(text: str) -> str:
     if m:
         return _trim_sentence(m.group(1), 140)
     return ""
+
+
+def _hostname(url: str) -> str:
+    """Extract hostname from URL for fallback labelling. localhost:8080 → localhost."""
+    m = re.match(r"https?://([^/:]+)(?::\d+)?", url)
+    return m.group(1) if m else url
+
+
+def extract_links(plan_text: str) -> list[dict]:
+    """Extract URLs from a plan. Returns list of {url, label, desc?, source}.
+
+    Strategy (priority order):
+      1. Dedicated `## Links` / `## Useful links` heading — if present, scan
+         only that section. Authors who fill this in get full control.
+      2. Fallback: scan §13 (Post-Validation) + §0.1 (Pre-Validation Probe)
+         for markdown links + bare URLs. These sections commonly carry
+         dashboard URLs, deploy URLs, monitoring panels.
+
+    All extracted entries are tagged `source: "autosync"` so manual
+    `--add-link` entries (default `source: "manual"` or absent) survive
+    autosync rewrites — see `update_existing_quest` link merge logic.
+
+    Dedupes by URL (first label wins). Returns [] if no URLs found."""
+    if not plan_text:
+        return []
+
+    # Tier 1: dedicated Links section
+    links_section_match = _LINKS_SECTION.search(plan_text)
+    target = links_section_match.group(0) if links_section_match else None
+
+    # Tier 2: §13 + §0.1 fallback
+    if target is None:
+        sec13 = re.search(
+            r"^##\s+Section\s+13\b.*?(?=^##\s+(?:Section|\d)|\Z)",
+            plan_text, re.MULTILINE | re.DOTALL | re.IGNORECASE,
+        )
+        sec01 = _SEC_01.search(plan_text)
+        target = ""
+        if sec13:
+            target += sec13.group(0) + "\n"
+        if sec01:
+            target += sec01.group(0)
+        if not target:
+            return []
+
+    seen_urls: set[str] = set()
+    out: list[dict] = []
+
+    # Markdown links first — they carry intentional labels.
+    for m in _MD_LINK.finditer(target):
+        label, url = m.group(1).strip(), m.group(2).strip()
+        url = url.rstrip(".,;:")
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        entry = {"url": url, "label": label[:80], "source": "autosync"}
+        out.append(entry)
+
+    # Bare URLs second — only those not already captured by markdown links.
+    for m in _BARE_URL.finditer(target):
+        url = m.group(0).rstrip(".,;:")
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        out.append({"url": url, "label": _hostname(url), "source": "autosync"})
+
+    return out
+
+
+_MD_INLINE_CODE = re.compile(r"`([^`\n]+)`")
+_MD_BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
+_MD_ITALIC = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
+
+
+def _escape_html(text: str) -> str:
+    """HTML-escape a string. Matches html.escape(quote=False) — leaves quotes alone
+    so attribute renderers downstream can quote properly."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def markdown_inline_to_html(body: str) -> str:
+    """Convert a small subset of inline markdown to HTML for action item bodies.
+
+    Supports: [label](url) → <a target=_blank>, `code` → <code>, **bold** → <strong>,
+    *italic* → <em>, paragraph breaks (blank line → </p><p>), single newlines → <br>.
+
+    Order matters: HTML-escape FIRST (so user can't inject raw HTML), then apply
+    transforms by re-introducing safe tags. Leaves unmatched markup as-is.
+    Trims surrounding whitespace and wraps in <p>...</p>."""
+    if not body:
+        return ""
+    body = body.strip()
+    if not body:
+        return ""
+
+    # 1. Stash markdown links FIRST as opaque tokens — they contain `(`/`[` which
+    #    confuse later HTML-escape if we don't preserve their structure.
+    link_tokens: list[tuple[str, str]] = []
+    def _stash_link(m: re.Match) -> str:
+        idx = len(link_tokens)
+        link_tokens.append((m.group(1), m.group(2)))
+        return f"\x00LINK{idx}\x00"
+    body = _MD_LINK.sub(_stash_link, body)
+
+    # 2. Stash inline `code` so backticks don't break later regex.
+    code_tokens: list[str] = []
+    def _stash_code(m: re.Match) -> str:
+        idx = len(code_tokens)
+        code_tokens.append(m.group(1))
+        return f"\x00CODE{idx}\x00"
+    body = _MD_INLINE_CODE.sub(_stash_code, body)
+
+    # 3. Escape HTML in remaining text.
+    body = _escape_html(body)
+
+    # 4. Apply bold + italic.
+    body = _MD_BOLD.sub(r"<strong>\1</strong>", body)
+    body = _MD_ITALIC.sub(r"<em>\1</em>", body)
+
+    # 5. Restore code + links with proper escaping for their content.
+    def _unstash_code(m: re.Match) -> str:
+        idx = int(m.group(1))
+        return f"<code>{_escape_html(code_tokens[idx])}</code>"
+    body = re.sub(r"\x00CODE(\d+)\x00", _unstash_code, body)
+
+    def _unstash_link(m: re.Match) -> str:
+        idx = int(m.group(1))
+        label, url = link_tokens[idx]
+        return (f'<a href="{_escape_html(url)}" target="_blank" rel="noopener">'
+                f'{_escape_html(label)}</a>')
+    body = re.sub(r"\x00LINK(\d+)\x00", _unstash_link, body)
+
+    # 6. Paragraph + line breaks. Blank line = paragraph break; single newline = <br>.
+    paragraphs = re.split(r"\n\s*\n", body)
+    rendered = []
+    for p in paragraphs:
+        p = p.strip()
+        if not p:
+            continue
+        # Single-line newlines → <br>
+        p = p.replace("\n", "<br>")
+        rendered.append(f"<p>{p}</p>")
+    return "".join(rendered)
+
+
+def parse_actions(section_text: str) -> list[dict]:
+    """Parse `### N. Title [STATUS]` items out of a section's body.
+
+    Returns list of {n, title, status, status_class, body_html}. `n` is 1-based;
+    auto-assigned if author omitted the number prefix. Items without any body
+    text get an empty body_html. The section_text passed in should be the
+    full `## Section X — Y` block (autosync passes the matched group)."""
+    if not section_text:
+        return []
+
+    matches = list(_ACTION_HEAD.finditer(section_text))
+    if not matches:
+        return []
+
+    items: list[dict] = []
+    for i, m in enumerate(matches):
+        n = m.group(1)
+        title = m.group(2).strip()
+        status_raw = (m.group(3) or "").strip()
+        status_text, status_class = status_to_class(status_raw)
+
+        # Body = text from end of this heading line to start of NEXT match
+        # (or end of section_text if last). Stop at any `## ` heading too —
+        # in case the author put `### N. ...` items spanning across §13/§14.
+        body_start = m.end()
+        if i + 1 < len(matches):
+            body_end = matches[i + 1].start()
+        else:
+            body_end = len(section_text)
+        body_raw = section_text[body_start:body_end]
+
+        # Strip a trailing `## ...` if present (don't include the next section)
+        next_h2 = re.search(r"^##\s", body_raw, re.MULTILINE)
+        if next_h2:
+            body_raw = body_raw[:next_h2.start()]
+        body_html = markdown_inline_to_html(body_raw)
+
+        items.append({
+            "n": int(n) if n else (i + 1),
+            "title": title[:200],
+            "status": status_text,
+            "status_class": status_class,
+            "body_html": body_html,
+        })
+    return items
+
+
+def parse_user_actions(plan_text: str) -> list[dict]:
+    """Extract checkbox tasks from `## Section 14 — User Actions` heading
+    (or just `## Section 14`). Optional section — returns [] if absent.
+    Same task shape as parse_plan_progress (title, done, problem?, solution?, brief?)."""
+    if not plan_text:
+        return []
+    m = re.search(
+        r"^##\s+Section\s+14\b.*?(?=^##\s+(?:Section|\d)|\Z)",
+        plan_text, re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    if not m:
+        return []
+    section = m.group(0)
+    # Reuse the same line-walker as parse_plan_progress
+    lines = section.split("\n")
+    tasks: list[dict] = []
+    current: dict | None = None
+
+    def _flush() -> None:
+        nonlocal current
+        if current is not None:
+            tasks.append(current)
+            current = None
+
+    for line in lines:
+        bm = _BOX_LINE.match(line)
+        if bm:
+            _flush()
+            mark = bm.group(2).lower()
+            title = bm.group(3).strip()
+            title = re.sub(r"\s+`[^`]*`\s*$", "", title)
+            current = {"title": title[:120], "done": mark == "x"}
+            continue
+        if current is None:
+            continue
+        sub = _SUBBULLET.match(line)
+        if sub:
+            text = sub.group(1).strip()[:200]
+            low = text.lower()
+            if low.startswith("problem:") or low.startswith("problem —") or low.startswith("problem -"):
+                current["problem"] = text.split(":", 1)[1].strip() if ":" in text else text[8:].strip()
+            elif low.startswith("solution:") or low.startswith("solution —") or low.startswith("solution -"):
+                current["solution"] = text.split(":", 1)[1].strip() if ":" in text else text[9:].strip()
+            elif "brief" not in current:
+                current["brief"] = text
+            continue
+        if line.strip() == "":
+            continue
+        _flush()
+    _flush()
+    return tasks
 
 
 def parse_plan_progress(plan_text: str) -> dict:
@@ -364,13 +670,53 @@ def update_existing_quest(quest: dict, plan_path: Path) -> dict:
         log_msg(f"WARN read plan for parse: {e}")
         return changes
 
+    # NEW: Rich `### N. Title [STATUS]` action format for §13 (Claude) + §14 (User).
+    # Falls back to legacy checkbox parsing per-section if no ### headings present
+    # — preserves back-compat for plans authored before the actions schema landed.
+    sec13 = re.search(
+        r"^##\s+Section\s+13\b.*?(?=^##\s+(?:Section|\d)|\Z)",
+        text, re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    sec14 = re.search(
+        r"^##\s+Section\s+14\b.*?(?=^##\s+(?:Section|\d)|\Z)",
+        text, re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    cc_actions = parse_actions(sec13.group(0)) if sec13 else []
+    user_actions_rich = parse_actions(sec14.group(0)) if sec14 else []
+
+    if cc_actions:
+        if cc_actions != quest.get("actions", []):
+            quest["actions"] = cc_actions
+            changes["actions"] = f"{len(cc_actions)} (§13 ###)"
+        # Compute progress from action statuses: DONE / total
+        done = sum(1 for a in cc_actions if a.get("status_class") == "done")
+        new_progress = round(done / len(cc_actions), 3) if cc_actions else 0
+        if abs(new_progress - quest.get("progress", 0)) > 0.001:
+            old_p = quest.get("progress", 0)
+            quest["progress"] = new_progress
+            changes["progress"] = f"{old_p:.2f}→{new_progress:.2f}"
+    elif "actions" in quest:
+        # §13 lost its ### content — drop stale actions cache
+        del quest["actions"]
+        changes["actions"] = "cleared"
+
+    if user_actions_rich:
+        if user_actions_rich != quest.get("actions_user", []):
+            quest["actions_user"] = user_actions_rich
+            changes["actions_user"] = f"{len(user_actions_rich)} (§14 ###)"
+    elif "actions_user" in quest:
+        del quest["actions_user"]
+        changes["actions_user"] = "cleared"
+
+    # LEGACY: checkbox parsing — only used if §13 has no ### headings.
+    # Quests with new-format §13 use `actions` instead of `tasks`.
     parsed = parse_plan_progress(text)
-    if parsed["tasks"]:
+    if not cc_actions and parsed["tasks"]:
         old_tasks = quest.get("tasks", [])
         if parsed["tasks"] != old_tasks:
             quest["tasks"] = parsed["tasks"]
             changes["tasks"] = f"{len(parsed['tasks'])} ({parsed['source']})"
-    if parsed["progress"] is not None:
+    if not cc_actions and parsed["progress"] is not None:
         old_progress = quest.get("progress", 0)
         if abs(parsed["progress"] - old_progress) > 0.001:
             quest["progress"] = parsed["progress"]
@@ -396,6 +742,42 @@ def update_existing_quest(quest: dict, plan_path: Path) -> dict:
         if v and quest.get(k) != v:
             quest[k] = v
             changes[k] = "updated"
+
+    # LEGACY: §14 checkbox fallback — only fires if no §14 ### actions present.
+    # Plans authored with the new ### N. Title [STATUS] schema use actions_user[].
+    if not user_actions_rich:
+        user_actions_legacy = parse_user_actions(text)
+        if user_actions_legacy:
+            old_user = quest.get("tasks_user", [])
+            if user_actions_legacy != old_user:
+                quest["tasks_user"] = user_actions_legacy
+                changes["tasks_user"] = f"{len(user_actions_legacy)} (§14 checkbox)"
+        elif "tasks_user" in quest:
+            del quest["tasks_user"]
+            changes["tasks_user"] = "cleared"
+    elif "tasks_user" in quest:
+        # §14 now uses ### actions — drop the legacy checkbox cache
+        del quest["tasks_user"]
+        changes["tasks_user"] = "migrated to actions_user"
+
+    # Links — autosync owns links flagged source:"autosync"; manual --add-link
+    # entries (no source field, or source:"manual") are preserved untouched.
+    auto_links = extract_links(text)
+    if auto_links is not None:
+        existing_links = quest.get("links", [])
+        manual = [L for L in existing_links if L.get("source") not in ("autosync",)]
+        merged = list(manual)
+        seen_urls = {L.get("url") for L in manual}
+        for L in auto_links:
+            if L.get("url") not in seen_urls:
+                merged.append(L)
+                seen_urls.add(L.get("url"))
+        if merged != existing_links:
+            if merged:
+                quest["links"] = merged
+            elif "links" in quest:
+                del quest["links"]
+            changes["links"] = f"{len(auto_links)} auto + {len(manual)} manual"
 
     # Always bump last_touched on any update event
     new_ts = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")

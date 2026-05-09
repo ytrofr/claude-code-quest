@@ -24,7 +24,71 @@ ROOT = Path.home() / ".claude"
 DATA = ROOT / "quest" / "data" / "quests.json"
 THEMES = ROOT / "skills" / "quest" / "themes"
 RENDER = ROOT / "skills" / "quest" / "render.py"
+RUN = ROOT / "quest" / "run"  # Per-session claim files live here
+CONFIG = ROOT / "quest" / "config.json"
 DASHBOARD_URL = "http://localhost:8770"
+
+
+# ---- Session identity (claim/unclaim) ----
+#
+# Each CC session is identified by walking up the process tree until we hit
+# a process whose comm == "claude". Its (pid, raw starttime ticks) form a
+# stable, deterministic key for the lifetime of that CC instance.
+#
+# Why not bus identity? The inter-agent registry has stale entries for sessions
+# whose SessionStart hook didn't register (or whose claude_pid rolled). Walking
+# /proc directly is more robust + dependency-free.
+def _walk_to_claude() -> tuple[int, str] | None:
+    """Walk up parent processes from CURRENT pid; return (claude_pid, raw_ticks)
+    for the first ancestor whose /proc/<pid>/comm == "claude". Raw ticks come
+    from /proc/<pid>/stat field 22 — set at fork, never changes (deterministic
+    fingerprint). Returns None on Linux/proc unavailability."""
+    import os as _os
+    pid = _os.getpid()
+    for _ in range(40):  # generous walk depth — hook chains can be 7-20 deep
+        if pid <= 1:
+            return None
+        try:
+            comm = (Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip())
+        except OSError:
+            return None
+        if comm == "claude":
+            try:
+                stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+            except OSError:
+                return None
+            # Strip the comm parens (it can contain spaces) before splitting.
+            stat_clean = re.sub(r"\([^)]*\)", "X", stat, count=1)
+            fields = stat_clean.split()
+            if len(fields) >= 22:
+                return (pid, fields[21])
+            return None
+        # Read ppid from stat field 4 (after stripping comm parens)
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        except OSError:
+            return None
+        stat_clean = re.sub(r"\([^)]*\)", "X", stat, count=1)
+        fields = stat_clean.split()
+        if len(fields) < 4:
+            return None
+        try:
+            pid = int(fields[3])
+        except ValueError:
+            return None
+    return None
+
+
+def session_key() -> str | None:
+    """Stable session identifier: '<claude_pid>-<starttime_ticks>'. None on failure."""
+    info = _walk_to_claude()
+    if not info:
+        return None
+    return f"{info[0]}-{info[1]}"
+
+
+def claim_file_for(key: str) -> Path:
+    return RUN / f"session-{key}.quest"
 
 LANDMARKS = ["house", "tower", "mill", "bridge", "camp", "cave", "castle"]
 
@@ -405,6 +469,190 @@ def cmd_chapters(args) -> int:
     return 0
 
 
+# ---- claim/unclaim (session ↔ quest binding for statusline) ----
+
+def _path_map() -> list[tuple[str, str]]:
+    """Read project path_map from ~/.claude/quest/config.json. [] if absent."""
+    try:
+        cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
+        return [(e["path"], e["id"]) for e in cfg.get("path_map", [])
+                if e.get("path") and e.get("id")]
+    except Exception:
+        return []
+
+
+def auto_detect_quest(cwd: str | None = None) -> tuple[str | None, str | None]:
+    """Best-effort detect (project_id, quest_id) for the current session.
+
+    Strategy:
+      1. Map cwd → project_id via path_map.
+      2. Inside that project, return the most-recently-touched current quest
+         (by `last_touched` ISO string; falls back to first listed if missing).
+      3. If no current quest, returns (project_id, None) — caller falls back
+         to project home URL.
+      4. If no project resolvable, returns (None, None) — caller falls back
+         to dashboard root.
+    """
+    import os as _os
+    cwd = cwd or _os.getcwd()
+    pid = None
+    # Match prefix when cwd is exactly the prefix OR starts with `prefix`
+    # followed by a separator (`/`, `-`, `_`). Lets one entry like
+    # `~/LimorAI` cover all worktrees `LimorAI-Limor`, `LimorAI-staging`,
+    # while rejecting `LimorAI2` / `LimorAIxyz`.
+    for prefix, candidate in _path_map():
+        prefix = prefix.rstrip("/")
+        if cwd == prefix or any(cwd.startswith(prefix + sep) for sep in ("/", "-", "_")):
+            pid = candidate
+            break
+    if pid is None:
+        return (None, None)
+
+    try:
+        data = load()
+    except Exception:
+        return (pid, None)
+    project = data.get("projects", {}).get(pid)
+    if not project:
+        return (pid, None)
+    currents = [q for q in project.get("quests", []) if q.get("status") == "current"]
+    if not currents:
+        return (pid, None)
+    # Most-recently-touched current — newest last_touched wins
+    currents.sort(key=lambda q: q.get("last_touched", ""), reverse=True)
+    return (pid, currents[0].get("id"))
+
+
+def _kebab(s: str) -> str:
+    """Kebab-case for session_name vs quest_id comparison."""
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
+def cmd_claim(args) -> int:
+    """Bind THIS session to a quest. With no args, claims whatever
+    auto-detect would pick (locks it in even when focus drifts)."""
+    key = session_key()
+    if not key:
+        print("ERROR: could not resolve CC session identity (not running under claude?)",
+              file=sys.stderr)
+        return 2
+    RUN.mkdir(parents=True, exist_ok=True)
+
+    # Resolve target — explicit args win, else auto-detect
+    project_id = getattr(args, "project_id", None)
+    quest_id = getattr(args, "quest_id", None)
+    if not project_id or not quest_id:
+        ap, aq = auto_detect_quest()
+        project_id = project_id or ap
+        quest_id = quest_id or aq
+
+    if not project_id:
+        print("ERROR: no project resolvable from cwd; pass <project> <quest-id> explicitly",
+              file=sys.stderr)
+        return 2
+    if not quest_id:
+        print(f"ERROR: no current quest in project '{project_id}' to auto-detect; "
+              f"pass <quest-id> explicitly", file=sys.stderr)
+        return 2
+
+    # Validate the quest exists
+    data = load()
+    project = data.get("projects", {}).get(project_id)
+    if not project:
+        print(f"ERROR: project '{project_id}' not found", file=sys.stderr)
+        return 2
+    quest = next((q for q in project.get("quests", []) if q.get("id") == quest_id), None)
+    if not quest:
+        print(f"ERROR: quest '{quest_id}' not found in project '{project_id}'", file=sys.stderr)
+        return 2
+
+    claim_file_for(key).write_text(f"{project_id}/{quest_id}\n", encoding="utf-8")
+
+    # Stamp session_name onto the quest so the dashboard title can render
+    # "Quest Name (session-name)" when they differ. Last-claimer-wins.
+    # session_name comes from --session-name flag (CC --name passed through).
+    session_name = getattr(args, "session_name", None) or ""
+    session_name = session_name.strip()
+    if session_name:
+        # Only store if it adds info — empty or kebab-equals-qid is noise.
+        if _kebab(session_name) != quest_id:
+            quest["claimed_session_name"] = session_name
+        else:
+            quest.pop("claimed_session_name", None)
+        save(data)
+        # Re-render so the title updates immediately
+        try:
+            subprocess.run(["python3", str(RENDER)], capture_output=True, timeout=10)
+        except Exception:
+            pass
+
+    print(f"Claimed: {project_id}/{quest_id} (#{quest.get('n','?')} {quest.get('name','?')})")
+    if session_name:
+        print(f"Session name: {session_name}")
+    print(f"Statusline link: {DASHBOARD_URL}/{project_id}/plan-card.html?q={quest_id}")
+    return 0
+
+
+def cmd_unclaim(args) -> int:
+    """Remove the claim file for THIS session. Statusline reverts to auto-detect.
+    Also clears claimed_session_name from the previously-claimed quest so the
+    dashboard title drops the session suffix."""
+    key = session_key()
+    if not key:
+        print("ERROR: could not resolve CC session identity", file=sys.stderr)
+        return 2
+    cf = claim_file_for(key)
+    if not cf.exists():
+        print("No active claim for this session.")
+        return 0
+
+    # Read what was claimed → clear claimed_session_name on that quest
+    try:
+        target = cf.read_text(encoding="utf-8").strip()
+        project_id, quest_id = target.split("/", 1)
+        data = load()
+        project = data.get("projects", {}).get(project_id)
+        if project:
+            quest = next((q for q in project.get("quests", []) if q.get("id") == quest_id), None)
+            if quest and "claimed_session_name" in quest:
+                del quest["claimed_session_name"]
+                save(data)
+                # Re-render so title clears
+                try:
+                    subprocess.run(["python3", str(RENDER)], capture_output=True, timeout=10)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    cf.unlink()
+    print(f"Unclaimed (was: {cf.name})")
+    return 0
+
+
+def cmd_claimed(args) -> int:
+    """Print the current claim (project/quest-id) for THIS session, or auto-detected fallback."""
+    key = session_key()
+    if not key:
+        print("ERROR: could not resolve CC session identity", file=sys.stderr)
+        return 2
+    cf = claim_file_for(key)
+    if cf.exists():
+        target = cf.read_text(encoding="utf-8").strip()
+        print(f"claim: {target}  (explicit, file: {cf.name})")
+    else:
+        ap, aq = auto_detect_quest()
+        if ap and aq:
+            print(f"claim: {ap}/{aq}  (auto-detect)")
+        elif ap:
+            print(f"claim: {ap}/-  (project home — no current quest)")
+        else:
+            print("claim: -  (no project resolvable from cwd)")
+    return 0
+
+
 # ---- argparse setup ----
 
 def build_parser() -> argparse.ArgumentParser:
@@ -488,6 +736,19 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("chapters", help="List archived chapters")
     s.add_argument("project_id", nargs="?", help="Optional — defaults to all projects")
     s.set_defaults(func=cmd_chapters)
+
+    s = sub.add_parser("claim", help="Bind THIS session to a quest (statusline link)")
+    s.add_argument("project_id", nargs="?", help="Project id (auto-detected from cwd if omitted)")
+    s.add_argument("quest_id", nargs="?", help="Quest id (auto-detected if omitted)")
+    s.add_argument("--session-name", default="",
+                   help="Session label to stamp on the quest (e.g. CC --name). Shown on dashboard title when it differs from quest id.")
+    s.set_defaults(func=cmd_claim)
+
+    s = sub.add_parser("unclaim", help="Remove THIS session's claim — revert to auto-detect")
+    s.set_defaults(func=cmd_unclaim)
+
+    s = sub.add_parser("claimed", help="Print the current claim for THIS session")
+    s.set_defaults(func=cmd_claimed)
 
     return p
 

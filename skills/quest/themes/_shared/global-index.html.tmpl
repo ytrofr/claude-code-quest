@@ -65,11 +65,11 @@
   .battling { padding: 9px 12px; background: rgba(255,106,58,0.08); border: 2.5px dashed #ff6a3a; border-radius: 8px; margin-bottom: 14px; }
   .bat-lbl { font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase; color: #5a1818; font-weight: 700; margin-bottom: 2px; }
   .bat-name { font-size: 13.2px; font-weight: 700; color: #5a1818; line-height: 1.3; }
-  .bat-name::before { content: '⚔ '; }
+  .bat-name { display: flex; align-items: center; gap: 6px; }
+  .bat-name .qd-icon { flex-shrink: 0; }
   .battling.idle { background: rgba(120,120,120,0.06); border-color: #999; }
   .battling.idle .bat-lbl { color: #6a5a4a; }
   .battling.idle .bat-name { color: #6a5a4a; }
-  .battling.idle .bat-name::before { content: '✦ '; }
 
   .actions { display: flex; gap: 8px; }
   .btn { flex: 1; padding: 10px 12px; border-radius: 12px; font-family: inherit; font-weight: 700; font-size: 12.1px; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; transition: transform 0.1s ease; border: 2.5px solid #2a3a4a; cursor: pointer; }
@@ -85,7 +85,7 @@
 
   <header class="head">
     <div class="head-title">
-      <div class="crest">⚔</div>
+      <div class="crest">{{> icons/active}}</div>
       <div>
         <h1>Trainer Hall</h1>
         <div class="sub">Welcome back, Trainer · pick a region to adventure</div>
@@ -129,13 +129,13 @@
         {{#if q.has_active}}
         <div class="battling">
           <div class="bat-lbl">Currently Battling</div>
-          <div class="bat-name">{{q.active_label}}</div>
+          <div class="bat-name">{{> icons/active}} <span>{{q.active_label}}</span></div>
         </div>
         {{/if}}
         {{#if q.no_active}}
         <div class="battling idle">
           <div class="bat-lbl">Idle</div>
-          <div class="bat-name">No active quest — start one</div>
+          <div class="bat-name">{{> icons/why}} <span>No active quest — start one</span></div>
         </div>
         {{/if}}
         <div class="actions">

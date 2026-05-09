@@ -104,9 +104,9 @@
   </header>
 
   <div class="filters" role="group" aria-label="Filter quests by status (multi-select)">
-    <button class="filt on" type="button" data-status="current" aria-pressed="true" title="Show in-progress quests"><span class="icon">⚔</span>Active <span class="count">{{counts.current}}</span></button>
-    <button class="filt on" type="button" data-status="done" aria-pressed="true" title="Show completed quests"><span class="icon">★</span>Visited <span class="count">{{counts.done}}</span></button>
-    <button class="filt on" type="button" data-status="locked" aria-pressed="true" title="Show locked quests"><span class="icon">🔒</span>Sealed <span class="count">{{counts.locked}}</span></button>
+    <button class="filt on" type="button" data-status="current" aria-pressed="true" title="Show in-progress quests"><span class="icon">{{> icons/active}}</span>Active <span class="count">{{counts.current}}</span></button>
+    <button class="filt on" type="button" data-status="done" aria-pressed="true" title="Show completed quests"><span class="icon">{{> icons/visited}}</span>Visited <span class="count">{{counts.done}}</span></button>
+    <button class="filt on" type="button" data-status="locked" aria-pressed="true" title="Show locked quests"><span class="icon">{{> icons/sealed}}</span>Sealed <span class="count">{{counts.locked}}</span></button>
     <span class="filt-sep" aria-hidden="true">·</span>
     <button class="filt filt-action" type="button" data-action="show-all" title="Reveal all statuses">Show All</button>
     <button class="filt filt-action" type="button" data-action="active-only" title="In-progress only">Active Only</button>
