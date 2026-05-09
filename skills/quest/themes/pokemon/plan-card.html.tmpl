@@ -111,6 +111,22 @@
   .qd-progress { position: relative; height: 18px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; overflow: hidden; margin-top: 6px; }
   .qd-progress-fill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); transition: width 0.3s ease; }
   .qd-progress-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.1px; color: #2a3a4a; }
+  /* Links section — pokemon theme */
+  .qd-links { margin-top: 18px; padding: 16px 18px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .qd-links-title { margin: 0 0 12px; font-weight: 700; font-size: 12.1px; letter-spacing: 2.5px; color: #2a3a4a; text-transform: uppercase; }
+  .qd-links-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .qd-link { padding: 0; }
+  .qd-link-anchor { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 4px; padding: 10px 12px; background: #f7eed8; border: 2px solid #2a3a4a; border-radius: 8px; text-decoration: none; color: #2a3a4a; transition: transform 0.08s ease; }
+  .qd-link-anchor:hover { transform: translateY(-1px); background: #fff0c8; box-shadow: 0 2px 0 #2a3a4a; }
+  .qd-link-label { grid-column: 1; grid-row: 1; font-weight: 700; font-size: 14.3px; color: #5a1818; align-self: baseline; }
+  .qd-link-url { grid-column: 2; grid-row: 1; font-family: ui-monospace, monospace; font-size: 11.5px; color: #6a7a8a; text-align: right; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: baseline; }
+  .qd-link-desc { grid-column: 1 / -1; grid-row: 2; font-weight: 500; font-size: 13.2px; color: #2a3a4a; }
+  @media (max-width: 720px) {
+    .qd-link-anchor { grid-template-columns: 1fr; }
+    .qd-link-label { grid-column: 1; grid-row: 1; }
+    .qd-link-url { grid-column: 1; grid-row: 3; text-align: left; max-width: 100%; }
+    .qd-link-desc { grid-column: 1; grid-row: 2; }
+  }
 </style>
 </head>
 <body>
@@ -201,6 +217,8 @@
       {{> _taskslist}}
 
       {{> _next-step}}
+
+      {{> _links}}
 
       {{> _meta-row}}
 
