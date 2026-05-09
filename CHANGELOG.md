@@ -2,6 +2,27 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] — 2026-05-09
+
+### Added
+- **Quest links section on the plan card** — each quest can carry an array of `{url, label, desc}` entries rendered as a clickable Links section between Next Move and the meta-row. Use this for deploy URLs, dashboards, PR/issue links, monitoring panels, related plan files — anything someone resuming the quest needs one-click access to.
+- **`/quest update --add-link "URL|LABEL|DESC"`** — repeatable flag to append link entries. LABEL and DESC are optional (URL alone uses URL as label).
+- **`/quest update --clear-links`** — wipe link entries on a quest. Runs before any `--add-link` in the same invocation, so `--clear-links --add-link "..." --add-link "..."` is the idiomatic "replace" pattern.
+- **Shared partial `themes/_shared/_links.html.tmpl`** — renders the section across all themes; iterates `{{#each links}}` and skips entirely when `links` is empty.
+- **2-row layout** on each link card: bold label (left) + monospace URL (right-aligned) on row 1; full-width subtitle (desc) on row 2. Mobile (<720px) stacks into a single column with label → desc → URL ordering.
+
+### Internal
+- `render.py` already hoisted `active.links` into project scope (no change needed); the v1.5.0 work was renderer surface (partial + per-theme CSS) plus the CLI flags. Schema v2 unchanged — `links` field has been declared since v1.0 but was never rendered until now.
+- Pokemon theme styles `.qd-link-anchor` with `#f7eed8` background, deep-red label (`#5a1818`), monospace dimmed URL. Storybook theme uses serif label, parchment background, dashed hover underline.
+
+### Migration
+No action required. Existing `quests.json` files render unchanged — quests with empty/missing `links` skip the section entirely. To start adding links to a quest:
+```bash
+/quest update <project> <quest> \
+  --add-link "https://staging.example.com|Staging|Hit after deploy to verify" \
+  --add-link "https://github.com/me/repo/pull/42|PR #42|Code review"
+```
+
 ## [1.4.1] — 2026-05-08
 
 ### Fixed
@@ -50,6 +71,7 @@ No action required. Existing `quests.json` files render unchanged. To customize 
 
 Initial public release of the engine. See [v1.2.0 release notes](https://github.com/ytrofr/claude-code-quest/releases/tag/v1.2.0) for the full snapshot: pokemon + storybook themes, autosync hook, systemd unit, MIT license, SEO/AEO/GEO README, CITATION.cff, ISSUE_TEMPLATE.
 
+[1.5.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/ytrofr/claude-code-quest/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.2.0...v1.4.0
 [1.2.0]: https://github.com/ytrofr/claude-code-quest/releases/tag/v1.2.0
