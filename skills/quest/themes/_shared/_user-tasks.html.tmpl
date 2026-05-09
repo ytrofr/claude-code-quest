@@ -1,26 +1,21 @@
-<!-- Partial: _taskslist (CC tasks — "Deeds")
-     Scope keys used: tasks (list), tasks_done (int), tasks_total (int), tasks_next (str)
-     Renders only when `tasks` is non-empty.
+<!-- Partial: _user-tasks
+     Scope keys used: tasks_user (list), tasks_user_done (int), tasks_user_total (int),
+                      tasks_user_next (str — title of first not-done task)
+     Renders only when `tasks_user` is non-empty.
      Each task object: { title, done, done_class, done_mark, problem?, solution?, has_brief? }
-     Wrapped in <details data-qd-collapse="cc"> — collapsed by default; JS persists open
-     state per (project, quest, section) in localStorage. Summary shows "Next:
-     <first-undone-title>" preview when collapsed.
-     The "Hide Done" toggle still sets body.hide-done-deeds; per-project filter persists. -->
-{{#if tasks}}
-<section class="qd-tasks" data-qd="tasks">
-  <details data-qd-collapse="cc">
+     Wrapped in <details data-qd-collapse="user"> — collapsed by default; JS persists.
+     Summary shows "Next: <first-undone-title>" preview when collapsed. -->
+{{#if tasks_user}}
+<section class="qd-user-tasks qd-tasks" data-qd="user-tasks">
+  <details data-qd-collapse="user">
     <summary class="qd-tasks-summary">
       <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
-      <h3 class="qd-tasks-title">Deeds (Claude)</h3>
-      <span class="qd-tasks-count">{{tasks_done}} / {{tasks_total}}</span>
-      {{#if tasks_next}}<span class="qd-tasks-summary-preview">Next: {{tasks_next}}</span>{{/if}}
-      <button class="qd-deeds-toggle" type="button" data-toggle="hide-done-deeds" aria-pressed="false" title="Hide completed deeds" onclick="event.stopPropagation();">
-        <span class="qd-toggle-mark" aria-hidden="true">○</span>
-        <span class="qd-toggle-label">Hide done</span>
-      </button>
+      <h3 class="qd-tasks-title">To-Do (You)</h3>
+      <span class="qd-tasks-count">{{tasks_user_done}} / {{tasks_user_total}}</span>
+      {{#if tasks_user_next}}<span class="qd-tasks-summary-preview">Next: {{tasks_user_next}}</span>{{/if}}
     </summary>
     <ul class="qd-tasks-list">
-      {{#each tasks}}
+      {{#each tasks_user}}
       <li class="qd-task qd-task-{{q.done_class}}">
         {{#if q.has_brief}}
         <details class="qd-task-details">

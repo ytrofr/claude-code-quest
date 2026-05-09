@@ -1,0 +1,50 @@
+<!-- Partial: _actions-claude
+     Scope: actions (list of {n, title, status, status_class, body_html}),
+            actions_done (int), actions_total (int), actions_next (str)
+     Renders only when `actions` is non-empty.
+     Wrapped in <details data-qd-collapse="cc-actions"> — collapsed by default;
+     existing JS in plan-card.html.tmpl persists open/closed state per quest in
+     localStorage[qd-collapse-<pid>-<quest-id>-cc-actions]. Summary shows the
+     theme robot icon, section title, count, and next-incomplete preview. -->
+{{#if actions_empty}}
+<section class="qd-actions qd-actions-claude qd-actions-empty" data-qd="actions-claude-empty">
+  <div class="qd-actions-summary-head">
+    <span class="qd-actions-icon">{{> icons/robot}}</span>
+    <h3 class="qd-actions-title">Claude's Actions</h3>
+    <span class="qd-actions-empty-badge">none yet</span>
+  </div>
+  <p class="qd-actions-empty-hint">No Claude actions on this quest. To add what Claude is doing or queued to do, append <code>## Section 13 — Post-Validation</code> to the plan file with <code>### N. Title [STATUS]</code> entries.</p>
+</section>
+{{/if}}
+{{#if actions}}
+<section class="qd-actions qd-actions-claude" data-qd="actions-claude">
+  <details data-qd-collapse="cc-actions">
+    <summary class="qd-actions-summary">
+      <div class="qd-actions-summary-head">
+        <span class="qd-actions-summary-arrow" aria-hidden="true">▸</span>
+        <span class="qd-actions-icon">{{> icons/robot}}</span>
+        <h3 class="qd-actions-title">Claude's Actions</h3>
+        <span class="qd-actions-count">{{actions_done}} / {{actions_total}}</span>
+      </div>
+      {{#if actions_next3}}
+      <ol class="qd-actions-summary-next3">
+        {{#each actions_next3}}
+        <li class="qd-action-status-{{q.status_class}}"><span class="qd-actions-summary-num">{{q.n}}</span><span class="qd-actions-summary-title">{{q.title}}</span>{{#if q.status}}<span class="qd-action-status qd-action-status-pill-{{q.status_class}}">{{q.status}}</span>{{/if}}</li>
+        {{/each}}
+      </ol>
+      {{/if}}
+    </summary>
+    <ol class="qd-actions-list">
+      {{#each actions}}
+      <li class="qd-action qd-action-status-{{q.status_class}}">
+        <span class="qd-action-num">{{q.n}}</span>
+        <div class="qd-action-body">
+          <p class="qd-action-head">{{q.title}}{{#if q.status}}<span class="qd-action-status qd-action-status-pill-{{q.status_class}}">{{q.status}}</span>{{/if}}</p>
+          {{{q.body_html}}}
+        </div>
+      </li>
+      {{/each}}
+    </ol>
+  </details>
+</section>
+{{/if}}

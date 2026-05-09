@@ -1,0 +1,7 @@
+<!-- Partial: _status-icon
+     Scope: active.is_current / active.is_done / active.is_locked (booleans)
+     Renders the status icon SVG for the active quest. Theme overrides are
+     looked up first via partial resolution; falls back to _shared/icons/. -->
+{{#if active.is_current}}{{> icons/active}}{{/if}}
+{{#if active.is_done}}{{> icons/visited}}{{/if}}
+{{#if active.is_locked}}{{> icons/sealed}}{{/if}}

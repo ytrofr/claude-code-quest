@@ -52,6 +52,9 @@
   .qd-back-link { display: inline-block; padding: 6px 12px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; text-decoration: none; font-weight: 700; font-size: 13.2px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 3px 0 #2a3a4a; }
   .qd-back-link:hover { transform: translateY(1px); box-shadow: 0 2px 0 #2a3a4a; }
   .qd-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+  /* When .qd-pills is nested inside .stat-row, promote its children to flex
+     siblings of stat-row's other pills so they wrap on the same line. */
+  .stat-row .qd-pills { display: contents; }
   .qd-pill { padding: 4px 10px; font-size: 12.1px; font-weight: 600; color: #2a3a4a; background: #fffdf2; border: 2px solid #2a3a4a; border-radius: 12px; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .qd-pill-branch { background: #d8eaf5; }
   .qd-pill-kpi { background: #fff0c8; }
@@ -127,137 +130,168 @@
     .qd-link-url { grid-column: 1; grid-row: 3; text-align: left; max-width: 100%; }
     .qd-link-desc { grid-column: 1; grid-row: 2; }
   }
+  /* Multi-active: ?q=<id> dispatcher hides all blocks but the matching one. */
+  .qd-quest-block { display: none; }
+  .qd-quest-block.qd-active { display: block; }
+  /* Multi-active picker — small bar above the quest body listing all currents. */
+  .qd-active-picker { max-width: 1280px; margin: 0 auto 14px; padding: 8px 14px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; box-shadow: 0 4px 0 #2a3a4a; }
+  .qd-active-picker-label { font-weight: 700; font-size: 12.1px; letter-spacing: 2px; color: #6a7a8a; text-transform: uppercase; }
+  .qd-active-picker-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .qd-active-picker a { padding: 4px 10px; background: #f7eed8; border: 2px solid #2a3a4a; border-radius: 8px; font-weight: 700; font-size: 13.2px; color: #2a3a4a; text-decoration: none; }
+  .qd-active-picker a.qd-active-picker-current { background: #ff6a3a; color: #fff; border-color: #5a1818; }
+  .qd-active-picker a:hover { background: #ffd24a; }
+  /* Two-section split: Deeds (Claude) + To-Do (User). Both <details>; collapsed default. */
+  .qd-tasks-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; padding: 4px 0; }
+  .qd-tasks-summary::-webkit-details-marker { display: none; }
+  .qd-tasks-summary-arrow { color: #ff6a3a; font-size: 13.2px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
+  details[open] > .qd-tasks-summary > .qd-tasks-summary-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-tasks-summary-preview { font-weight: 600; font-size: 13.2px; color: #6a7a8a; font-style: italic; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qd-user-tasks { margin-top: 18px; padding: 16px 18px; background: #fff; border: 3px solid #5a8aa0; border-radius: 12px; }
+  .qd-user-tasks .qd-tasks-title { color: #2a5a8a; }
+  .qd-user-tasks .qd-tasks-count { color: #2a5a8a; }
+  .qd-user-tasks .qd-task-mark { border-color: #2a5a8a; }
+  .qd-user-tasks .qd-task-done .qd-task-mark { background: #5a8aa0; border-color: #2a5a8a; }
+  /* Rich actions sections — Your Actions / Claude's Actions. Flat numbered list. */
+  .qd-actions { margin-top: 22px; padding: 18px 20px; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .qd-actions-claude { background: rgba(91,180,216,0.08); border-color: #5a1818; }
+  .qd-actions-user   { background: rgba(255,210,74,0.10); border-color: #ff6a3a; }
+  .qd-actions-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px dashed rgba(42,58,74,0.25); }
+  .qd-actions-icon { display: inline-flex; align-items: center; justify-content: center; }
+  .qd-actions-icon svg { display: block; }
+  .qd-actions-title { margin: 0; font-weight: 700; font-size: 16.5px; color: #2a3a4a; flex: 1; }
+  .qd-actions-claude .qd-actions-title { color: #5a1818; }
+  .qd-actions-user   .qd-actions-title { color: #c45a18; }
+  .qd-actions-count { font-weight: 700; font-size: 12.1px; padding: 3px 10px; border-radius: 12px; background: #fffdf2; border: 2px solid #2a3a4a; color: #2a3a4a; }
+  .qd-actions-list { list-style: none; padding: 0; margin: 0; counter-reset: action-num; }
+  .qd-action { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px dashed rgba(42,58,74,0.18); align-items: start; }
+  .qd-action:last-child { border-bottom: none; padding-bottom: 0; }
+  .qd-action-num { width: 28px; height: 28px; border-radius: 50%; background: #ffd24a; border: 2px solid #5a1818; box-shadow: 0 2px 0 #c9a020; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13.2px; color: #5a1818; line-height: 1; }
+  .qd-actions-claude .qd-action-num { background: #bcd4dd; border-color: #2a5a8a; box-shadow: 0 2px 0 #2a5a8a; color: #1a4a8a; }
+  .qd-actions-user .qd-action-num { background: #ffd24a; border-color: #c45a18; box-shadow: 0 2px 0 #c45a18; color: #5a1818; }
+  .qd-action-body { font-size: 13.8px; line-height: 1.5; color: #2a3a4a; }
+  .qd-action-head { margin: 0 0 6px; font-weight: 700; font-size: 14.3px; color: #2a3a4a; line-height: 1.35; }
+  .qd-action-body p { margin: 0 0 6px; }
+  .qd-action-body p:last-child { margin-bottom: 0; }
+  .qd-action-body code { font-family: ui-monospace, monospace; background: #f7eed8; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .qd-action-body a { color: #c44a2a; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c44a2a; }
+  .qd-action-body a:hover { background: #ffd9b8; border-bottom-style: solid; }
+  /* Status pill — colour buckets */
+  .qd-action-status { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 11px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; vertical-align: middle; }
+  .qd-action-status-pill-todo       { background: #fff0c8; color: #6a4a1a; border: 1px solid #c0a878; }
+  .qd-action-status-pill-done       { background: #d8f0c8; color: #2a5a1a; border: 1px solid #5e9a4a; }
+  .qd-action-status-pill-waiting    { background: #e8e8e8; color: #555;    border: 1px solid #999; }
+  .qd-action-status-pill-queued     { background: #d8eaf5; color: #1a4a8a; border: 1px solid #3a8ae6; }
+  .qd-action-status-pill-continuous { background: #c8e8e0; color: #1a5a4a; border: 1px solid #3a9080; }
+  .qd-action-status-pill-default    { background: #f0f0f0; color: #444;    border: 1px solid #aaa; }
+  .qd-action-status-done .qd-action-head { color: #2a5a1a; text-decoration: line-through; }
+  .qd-action-status-done .qd-action-num  { background: #5e9a4a; color: #fff; border-color: #2a5a1a; box-shadow: 0 2px 0 #2a5a1a; }
+  /* Problem/Solution brief lines with inline icons */
+  .qd-brief-line .qd-brief-icon { display: inline-flex; vertical-align: -2px; margin-right: 6px; color: #5a1818; }
+  .qd-brief-problem .qd-brief-icon { color: #c44a2a; }
+  .qd-brief-solution .qd-brief-icon { color: #c9a020; }
+  /* Collapsible summary header for actions sections (collapsed by default) */
+  .qd-actions details > summary { display: block; cursor: pointer; list-style: none; padding: 4px 0 12px; border-bottom: 2px dashed rgba(42,58,74,0.25); }
+  .qd-actions details > summary::-webkit-details-marker { display: none; }
+  .qd-actions details[open] > summary { margin-bottom: 14px; }
+  .qd-actions-summary-head { display: flex; align-items: center; gap: 10px; }
+  .qd-actions-summary-arrow { color: #ff6a3a; font-size: 14.3px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
+  .qd-actions details[open] > summary .qd-actions-summary-arrow { transform: rotate(90deg); opacity: 1; }
+  /* Next-3 peek inside the collapsed <summary> — hidden when section open */
+  .qd-actions details[open] > summary .qd-actions-summary-next3 { display: none; }
+  .qd-actions-summary-next3 { list-style: none; margin: 10px 0 0; padding: 0 0 0 30px; display: grid; gap: 4px; }
+  .qd-actions-summary-next3 > li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 3px 0; line-height: 1.4; }
+  .qd-actions-summary-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #f7eed8; border: 1.5px solid #6a7a8a; font-weight: 700; font-size: 10.5px; color: #2a3a4a; flex-shrink: 0; line-height: 1; }
+  .qd-actions-summary-title { color: #2a3a4a; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .qd-actions-summary-next3 .qd-action-status { font-size: 9.5px; padding: 1px 6px; }
+  .qd-actions-summary-next3 li.qd-action-status-done .qd-actions-summary-title { text-decoration: line-through; opacity: 0.6; }
+  /* Empty-state placeholder — shown when one side has actions, the other doesn't. */
+  .qd-actions.qd-actions-empty { padding: 14px 18px; opacity: 0.85; border-style: dashed; border-width: 2px; }
+  .qd-actions-empty .qd-actions-summary-head { padding-bottom: 8px; border-bottom: 1px dashed rgba(42,58,74,0.2); margin-bottom: 8px; }
+  .qd-actions-empty-badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 11px; background: #f7eed8; color: #6a7a8a; border: 1.5px dashed #6a7a8a; letter-spacing: 0.5px; text-transform: uppercase; }
+  .qd-actions-empty-hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: #6a7a8a; }
+  .qd-actions-empty-hint code { background: #f7eed8; padding: 1px 5px; border-radius: 4px; font-size: 11.5px; color: #2a3a4a; }
+  .qd-actions-empty-hint a { color: #ff6a3a; font-weight: 600; }
 </style>
 </head>
 <body>
-<div class="frame">
-  <header class="head">
-    <div class="title">
-      <div class="badge">{{level_roman}}</div>
-      <div>
-        <h1>{{name}} · Quest Detail</h1>
-        <div class="sub">{{subtitle}} · viewing Quest {{active.n}}</div>
-      </div>
-    </div>
-    <nav class="nav">
-      <a href="route.html">MAP</a>
-      <a href="quest-log.html">QUEST LOG</a>
-    </nav>
-  </header>
-
-  <div class="crumbs">
-    {{> _back-link}}
-    <span>›</span>
-    <a href="quest-log.html">Quest Log</a>
-    <span>›</span>
-    <span class="here">Quest {{active.n}} · {{active.name}}</span>
-  </div>
-
-  <div class="body">
-    <div class="illus-cell">
-      <svg viewBox="0 0 540 540" preserveAspectRatio="xMidYMid meet">
-        <rect x="0" y="0" width="540" height="180" fill="#bbe4f5"/>
-        <rect x="0" y="180" width="540" height="360" fill="#8fc97a"/>
-        <g fill="#fff" opacity="0.9">
-          <ellipse cx="100" cy="60" rx="46" ry="14"/><ellipse cx="120" cy="52" rx="34" ry="12"/>
-          <ellipse cx="420" cy="80" rx="50" ry="14"/>
-        </g>
-        <polygon points="0,200 80,100 160,200" fill="#7aa6c0"/>
-        <polygon points="380,200 460,90 540,200" fill="#7aa6c0"/>
-        <g fill="#5aa050" stroke="#3a7a3a" stroke-width="2"><ellipse cx="80" cy="450" rx="22" ry="10"/><ellipse cx="450" cy="460" rx="20" ry="9"/></g>
-        <g transform="translate(60,360)"><ellipse cx="0" cy="6" rx="20" ry="4" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="-12" width="6" height="14" fill="#6a4020"/><circle cx="0" cy="-22" r="22" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2.5"/></g>
-        <g transform="translate(490,380)"><ellipse cx="0" cy="6" rx="22" ry="4" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="-14" width="6" height="16" fill="#6a4020"/><circle cx="0" cy="-24" r="24" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2.5"/></g>
-        <path d="M 0 480 Q 100 460 200 440 Q 270 420 270 380" stroke="#5a4830" stroke-width="44" fill="none" stroke-linecap="round"/>
-        <path d="M 0 480 Q 100 460 200 440 Q 270 420 270 380" stroke="#efd9a3" stroke-width="34" fill="none" stroke-linecap="round"/>
-        <g transform="translate(270,300)" style="transform-origin:center;">
-          <g style="transform: scale(2.2); transform-origin: center;">{{{active.landmark_svg}}}</g>
-          <g class="twinkle" transform="translate(110, -50)">
-            <circle r="20" fill="#ffd24a" stroke="#5a1818" stroke-width="3.5"/>
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-weight="900" font-size="26" font-family="Fredoka" fill="#5a1818">!</text>
-          </g>
-        </g>
-      </svg>
-    </div>
-
-    <div class="info-cell">
-      <div class="quest-no">▸ QUEST NO. {{active.n}} OF {{counts.total}} · ACTIVE</div>
-      <h2 class="quest-title">{{active.name}}</h2>
-      <div class="stat-row">
-        <span class="pill type">⚔ ACTIVE</span>
-        <span class="pill">+{{active.xp_reward}} XP</span>
-      </div>
-      {{> _pills}}
-
-      <div class="stats-block">
-        <div class="stats-h">— Trainer Stats —</div>
-        <div class="stat-line">
-          <span>Progress</span>
-          <div class="barbg"><div class="barfill" style="width:{{active_progress_pct}}%"></div></div>
-          <span class="v">{{active_progress_pct}}%</span>
-        </div>
-        <div class="stat-line">
-          <span>Reward</span>
-          <div class="barbg"><div class="barfill" style="width:50%; background: #5e9a4a;"></div></div>
-          <span class="v">+{{active.xp_reward}}</span>
-        </div>
-        <div class="stat-line">
-          <span>Region</span>
-          <div class="barbg"><div class="barfill" style="width:{{xp_pct}}%; background: #ffd24a;"></div></div>
-          <span class="v">Lv {{level}}</span>
-        </div>
-      </div>
-
-      <div class="desc">
-        <div class="desc-h">— Quest Brief —</div>
-        <p>{{active.desc}}</p>
-        {{> _problem-solution}}
-        {{> _why}}
-      </div>
-
-      {{> _taskslist}}
-
-      {{> _next-step}}
-
-      {{> _links}}
-
-      {{> _meta-row}}
-
-      <div class="actions">
-        <a class="btn primary" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> Resume Quest</a>
-        <a class="btn ghost" href="quest-log.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg> Back to Log</a>
-      </div>
-
-      <p class="meta-line">📜 Plan file: <code>~/.claude/plans/{{active.plan}}</code></p>
-    </div>
-  </div>
-</div>
+{{{active_picker_html}}}
+{{{quest_blocks_html}}}
 <script>
 (function() {
-  // Hide-done-deeds toggle. Persists per-project alongside the quest-log status filter.
   var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
-  var KEY = 'qd-filter-' + pid;
-  function load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
-  }
-  function save(s) {
-    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
-  }
-  var state = load();
-  var btn = document.querySelector('.qd-deeds-toggle');
-  function apply() {
-    document.body.classList.toggle('hide-done-deeds', !!state.hideDoneDeeds);
-    if (btn) {
-      btn.classList.toggle('on', !!state.hideDoneDeeds);
-      btn.setAttribute('aria-pressed', state.hideDoneDeeds ? 'true' : 'false');
+
+  // ---- ?q=<id> dispatcher: which quest block is visible ----
+  var defaultQid = {{{default_quest_json}}};
+  var params = new URLSearchParams(location.search);
+  var requested = params.get('q') || defaultQid;
+  function activate(qid) {
+    var blocks = document.querySelectorAll('.qd-quest-block');
+    var found = null;
+    blocks.forEach(function(b) {
+      if (b.getAttribute('data-quest-id') === qid) {
+        b.classList.add('qd-active'); found = b;
+      } else {
+        b.classList.remove('qd-active');
+      }
+    });
+    if (!found && blocks.length) {
+      blocks[0].classList.add('qd-active'); found = blocks[0];
     }
-  }
-  if (btn) {
-    btn.addEventListener('click', function() {
-      state.hideDoneDeeds = !state.hideDoneDeeds;
-      save(state); apply();
+    if (found) {
+      var name = found.getAttribute('data-quest-name') || '';
+      var n = found.getAttribute('data-quest-n') || '';
+      if (name) document.title = (document.title.split(' — ')[0]) + ' — Quest ' + n + ': ' + name;
+    }
+    // Update active-picker highlight
+    document.querySelectorAll('.qd-active-picker a').forEach(function(a) {
+      a.classList.toggle('qd-active-picker-current', a.getAttribute('data-qid') === qid);
     });
   }
-  apply();
+  activate(requested);
+
+  // ---- Hide-done-deeds toggle (per-project) ----
+  var FILTER_KEY = 'qd-filter-' + pid;
+  function loadFilter() {
+    try { return JSON.parse(localStorage.getItem(FILTER_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveFilter(s) {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var fState = loadFilter();
+  function applyFilter() {
+    document.body.classList.toggle('hide-done-deeds', !!fState.hideDoneDeeds);
+    document.querySelectorAll('.qd-deeds-toggle').forEach(function(btn) {
+      btn.classList.toggle('on', !!fState.hideDoneDeeds);
+      btn.setAttribute('aria-pressed', fState.hideDoneDeeds ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.qd-deeds-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      fState.hideDoneDeeds = !fState.hideDoneDeeds;
+      saveFilter(fState); applyFilter();
+    });
+  });
+  applyFilter();
+
+  // ---- Per-section collapse persistence (Deeds + To-Do) ----
+  // Key shape: qd-collapse-<pid>-<quest-id>-<section>  → "open" | "closed"
+  function collapseKey(qid, section) {
+    return 'qd-collapse-' + pid + '-' + qid + '-' + section;
+  }
+  document.querySelectorAll('details[data-qd-collapse]').forEach(function(det) {
+    var section = det.getAttribute('data-qd-collapse');
+    var qBlock = det.closest('.qd-quest-block');
+    var qid = qBlock ? qBlock.getAttribute('data-quest-id') : 'default';
+    var k = collapseKey(qid, section);
+    var stored = null;
+    try { stored = localStorage.getItem(k); } catch (e) {}
+    // Default = closed (collapsed by default per spec); user can open & we remember.
+    if (stored === 'open') det.open = true;
+    else if (stored === 'closed') det.open = false;
+    det.addEventListener('toggle', function() {
+      try { localStorage.setItem(k, det.open ? 'open' : 'closed'); } catch (e) {}
+    });
+  });
 })();
 </script>
 </body>

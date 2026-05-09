@@ -131,125 +131,156 @@
     .qd-link-url { grid-column: 1; grid-row: 3; text-align: left; max-width: 100%; }
     .qd-link-desc { grid-column: 1; grid-row: 2; }
   }
+  /* Multi-active: ?q=<id> dispatcher hides all blocks but the matching one. */
+  .qd-quest-block { display: none; }
+  .qd-quest-block.qd-active { display: block; }
+  .qd-active-picker { max-width: 1280px; margin: 0 auto 14px; padding: 8px 14px; background: #fbf3df; border: 2.5px solid #4a2e1a; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-family: 'Eczar', serif; }
+  .qd-active-picker-label { font-weight: 700; font-size: 12.1px; letter-spacing: 2.5px; color: #7a5a3a; text-transform: uppercase; }
+  .qd-active-picker-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .qd-active-picker a { padding: 4px 12px; background: #fffdf6; border: 1.5px solid #4a2e1a; font-weight: 700; font-size: 13.2px; color: #4a2e1a; text-decoration: none; }
+  .qd-active-picker a.qd-active-picker-current { background: #c44a2a; color: #fbf3df; }
+  .qd-active-picker a:hover { background: #f0c050; }
+  /* Two-section split + collapse summary */
+  .qd-tasks-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; padding: 4px 0; }
+  .qd-tasks-summary::-webkit-details-marker { display: none; }
+  .qd-tasks-summary-arrow { color: #c44a2a; font-size: 14.3px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
+  details[open] > .qd-tasks-summary > .qd-tasks-summary-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-tasks-summary-preview { font-family: 'Eczar', serif; font-style: italic; font-size: 14.3px; color: #7a5a3a; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qd-user-tasks { margin-top: 22px; padding: 18px 22px; background: rgba(58,138,160,0.06); border: 2px solid #3a8aa0; }
+  .qd-user-tasks .qd-tasks-title { color: #3a8aa0; }
+  .qd-user-tasks .qd-tasks-count { color: #3a8aa0; }
+  /* Rich actions sections — Your Actions / Claude's Actions. Storybook palette. */
+  .qd-actions { margin-top: 26px; padding: 18px 22px; border: 1.5px solid #4a2e1a; background: #fbf3df; }
+  .qd-actions-claude { border-color: #7a5a3a; background: rgba(200,176,154,0.18); }
+  .qd-actions-user   { border-color: #c44a2a; background: rgba(196,74,42,0.06); }
+  .qd-actions-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px dashed #c89030; }
+  .qd-actions-icon { display: inline-flex; align-items: center; justify-content: center; }
+  .qd-actions-icon svg { display: block; }
+  .qd-actions-title { margin: 0; font-family: 'Eczar', serif; font-weight: 700; font-size: 19.8px; color: #4a2e1a; flex: 1; letter-spacing: 0.3px; }
+  .qd-actions-claude .qd-actions-title { color: #7a5a3a; }
+  .qd-actions-user   .qd-actions-title { color: #c44a2a; }
+  .qd-actions-count { font-family: 'Eczar', serif; font-weight: 700; font-size: 13.2px; padding: 2px 10px; background: #fffdf6; border: 1.5px solid #4a2e1a; color: #4a2e1a; }
+  .qd-actions-list { list-style: none; padding: 0; margin: 0; }
+  .qd-action { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 14px 0; border-bottom: 1px dotted #c89030; align-items: start; }
+  .qd-action:last-child { border-bottom: none; padding-bottom: 0; }
+  .qd-action-num { width: 30px; height: 30px; border-radius: 50%; background: #c89030; border: 1.5px solid #4a2e1a; display: flex; align-items: center; justify-content: center; font-family: 'Eczar', serif; font-weight: 700; font-size: 14.3px; color: #fbf3df; line-height: 1; }
+  .qd-actions-claude .qd-action-num { background: #7a5a3a; }
+  .qd-actions-user .qd-action-num { background: #c44a2a; }
+  .qd-action-body { font-family: 'Eczar', serif; font-size: 15.4px; line-height: 1.6; color: #2a1f15; }
+  .qd-action-head { margin: 0 0 8px; font-weight: 700; font-size: 16.5px; color: #4a2e1a; line-height: 1.3; }
+  .qd-action-body p { margin: 0 0 6px; }
+  .qd-action-body p:last-child { margin-bottom: 0; }
+  .qd-action-body code { font-family: ui-monospace, monospace; background: #f3e6c4; padding: 1px 6px; border: 1px solid #c89030; font-size: 13.2px; font-style: normal; }
+  .qd-action-body a { color: #c44a2a; font-weight: 700; text-decoration: none; border-bottom: 1px dashed #c44a2a; }
+  .qd-action-body a:hover { background: #f3e6c4; border-bottom-style: solid; }
+  .qd-action-status { display: inline-block; margin-left: 8px; padding: 1px 9px; font-family: 'Eczar', serif; font-size: 11.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; vertical-align: middle; }
+  .qd-action-status-pill-todo       { background: #f0c050; color: #4a2e1a; border: 1px solid #c89030; }
+  .qd-action-status-pill-done       { background: #d8e0a8; color: #4a2e1a; border: 1px solid #8a9050; }
+  .qd-action-status-pill-waiting    { background: #d8d4c8; color: #4a2e1a; border: 1px solid #8a8478; }
+  .qd-action-status-pill-queued     { background: #c8d8e8; color: #2a4a6a; border: 1px solid #6a8aa8; }
+  .qd-action-status-pill-continuous { background: #b8d4c8; color: #2a4a3a; border: 1px solid #5a8a78; }
+  .qd-action-status-pill-default    { background: #f3e6c4; color: #4a2e1a; border: 1px solid #c89030; }
+  .qd-action-status-done .qd-action-head { color: #5a6a3a; text-decoration: line-through; }
+  .qd-action-status-done .qd-action-num  { background: #8a9050; }
+  /* Problem/Solution brief lines with inline icons */
+  .qd-brief-line .qd-brief-icon { display: inline-flex; vertical-align: -2px; margin-right: 6px; color: #4a2e1a; }
+  .qd-brief-problem .qd-brief-icon { color: #c44a2a; }
+  .qd-brief-solution .qd-brief-icon { color: #c89030; }
+  /* Collapsible summary header for actions sections (collapsed by default) */
+  .qd-actions details > summary { display: block; cursor: pointer; list-style: none; padding: 4px 0 12px; border-bottom: 1px dashed #c89030; }
+  .qd-actions details > summary::-webkit-details-marker { display: none; }
+  .qd-actions details[open] > summary { margin-bottom: 14px; }
+  .qd-actions-summary-head { display: flex; align-items: center; gap: 10px; }
+  .qd-actions-summary-arrow { color: #c44a2a; font-size: 14.3px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
+  .qd-actions details[open] > summary .qd-actions-summary-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-actions details[open] > summary .qd-actions-summary-next3 { display: none; }
+  .qd-actions-summary-next3 { list-style: none; margin: 10px 0 0; padding: 0 0 0 32px; display: grid; gap: 4px; font-family: 'Eczar', serif; }
+  .qd-actions-summary-next3 > li { display: flex; align-items: baseline; gap: 8px; font-size: 14.3px; padding: 3px 0; line-height: 1.4; color: #4a2e1a; }
+  .qd-actions-summary-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: #fbf3df; border: 1px solid #8a6f4a; font-weight: 700; font-size: 11.5px; color: #4a2e1a; flex-shrink: 0; line-height: 1; }
+  .qd-actions-summary-title { font-style: italic; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .qd-actions-summary-next3 .qd-action-status { font-size: 10px; padding: 1px 7px; }
+  .qd-actions-summary-next3 li.qd-action-status-done .qd-actions-summary-title { text-decoration: line-through; opacity: 0.6; }
+  /* Empty-state placeholder */
+  .qd-actions.qd-actions-empty { padding: 14px 20px; opacity: 0.85; border-style: dashed; border-width: 1.5px; }
+  .qd-actions-empty .qd-actions-summary-head { padding-bottom: 8px; border-bottom: 1px dashed #c89030; margin-bottom: 8px; }
+  .qd-actions-empty-badge { font-family: 'Eczar', serif; font-size: 11px; font-weight: 700; padding: 2px 9px; background: #fbf3df; color: #7a5a3a; border: 1px dashed #7a5a3a; letter-spacing: 1px; text-transform: uppercase; }
+  .qd-actions-empty-hint { margin: 0; font-family: 'Eczar', serif; font-size: 13.5px; line-height: 1.55; color: #7a5a3a; font-style: italic; }
+  .qd-actions-empty-hint code { font-family: ui-monospace, monospace; background: #fbf3df; padding: 1px 6px; border: 1px solid #c89030; font-size: 12.5px; color: #4a2e1a; font-style: normal; }
+  .qd-actions-empty-hint a { color: #c44a2a; font-weight: 700; }
 </style>
 </head>
 <body>
-<div class="frame">
-  <header class="head">
-    <div class="title-row">
-      <svg class="crest" viewBox="0 0 56 56">
-        <path d="M 28 4 L 50 14 V 30 Q 50 46 28 52 Q 6 46 6 30 V 14 Z" fill="#fbf3df" stroke="#4a2e1a" stroke-width="2.5"/>
-        <path d="M 28 12 L 42 18 V 30 Q 42 40 28 44 Q 14 40 14 30 V 18 Z" fill="#c89030" stroke="#4a2e1a" stroke-width="1.5"/>
-        <text x="28" y="32" text-anchor="middle" dominant-baseline="central" font-family="Eczar" font-weight="700" font-size="16" fill="#fbf3df">{{level_roman}}</text>
-      </svg>
-      <div>
-        <h1>The Tale of {{name}}</h1>
-        <div class="sub">Chapter {{active.n}} · folio xii</div>
-      </div>
-    </div>
-    <nav class="nav">
-      <a href="route.html">MAP</a>
-      <a href="quest-log.html">CHAPTERS</a>
-    </nav>
-  </header>
-
-  <div class="crumbs">
-    {{> _back-link}}
-    <span>·</span>
-    <a href="quest-log.html">Chapters</a>
-    <span>·</span>
-    <span class="here">Chapter {{active.n}} — {{active.name}}</span>
-  </div>
-
-  <div class="spread">
-    <div class="left-page">
-      <div class="illus-frame">
-        <svg viewBox="0 0 540 460" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <radialGradient id="sky-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#fbe8c4"/><stop offset="100%" stop-color="#e8d4a0"/></radialGradient>
-            <radialGradient id="mtn-grad-c" cx="50%" cy="20%"><stop offset="0%" stop-color="#c8b09a"/><stop offset="100%" stop-color="#7a5a40"/></radialGradient>
-          </defs>
-          <rect width="540" height="460" fill="url(#sky-grad-c)"/>
-          <ellipse cx="270" cy="280" rx="220" ry="80" fill="#c8b08a" opacity="0.4"/>
-          <polygon points="180,300 250,140 320,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
-          <polygon points="220,250 250,210 280,250" fill="#fff" opacity="0.6"/>
-          <polygon points="280,300 350,160 420,300" fill="url(#mtn-grad-c)" stroke="#5a4028" stroke-width="2"/>
-          <g transform="translate(270,330) scale(2.2)">{{{active.landmark_svg}}}</g>
-          <g class="twinkle">
-            <polygon points="180,180 184,170 192,168 184,166 180,156 176,166 168,168 176,170" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
-            <polygon points="380,200 384,190 392,188 384,186 380,176 376,186 368,188 376,190" fill="#ffd24a" stroke="#4a2e1a" stroke-width="1"/>
-          </g>
-        </svg>
-      </div>
-      <p class="illus-cap">— Plate {{active.n}} — {{active.name}}, drawn from the operator's own hand.</p>
-
-      <div class="illus-stats">
-        <div class="h">— Of This Endeavour —</div>
-        <div class="row"><span class="lbl">Reward</span><span class="val">+{{active.xp_reward}} leagues</span></div>
-        <div class="row"><span class="lbl">Progress</span><span class="val">{{active_progress_pct}}%</span></div>
-        <div class="row"><span class="lbl">Region</span><span class="val">Lvl {{level_roman}}</span></div>
-        <div class="row"><span class="lbl">Of total</span><span class="val">Chapter {{active.n}} of {{counts.total}}</span></div>
-      </div>
-    </div>
-
-    <div class="right-page">
-      <div class="chapter-mark">— Chapter the {{active.n}} —</div>
-      <h2>{{active.name}}</h2>
-      <p class="epigraph">{{active.desc}}</p>
-      {{> _problem-solution}}
-      {{> _why}}
-      {{> _pills}}
-      <div class="ornament">❦ ⁂ ❦</div>
-
-      <div class="narrative">
-        <p><span class="drop-cap">L</span>ONG had the operator pursued this endeavour through its many forms. The chronicle recorded here is a faithful accounting of the deeds undertaken and yet to come.</p>
-        <blockquote class="pull">"{{active.next_step}}"</blockquote>
-        <p>Once accomplished, further chapters unseal — and the operator advances toward the great Lvl {{level_roman}}+1.</p>
-      </div>
-
-      {{> _taskslist}}
-
-      {{> _next-step}}
-
-      {{> _links}}
-
-      {{> _meta-row}}
-
-      <p class="margin">📜 Charter: <code>~/.claude/plans/{{active.plan}}</code></p>
-
-      <div class="actions">
-        <a class="btn primary" href="#">Resume the Quest</a>
-        <a class="btn ghost" href="quest-log.html">To Chapters</a>
-      </div>
-    </div>
-  </div>
-</div>
+{{{active_picker_html}}}
+{{{quest_blocks_html}}}
 <script>
 (function() {
   var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
-  var KEY = 'qd-filter-' + pid;
-  function load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
-  }
-  function save(s) {
-    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
-  }
-  var state = load();
-  var btn = document.querySelector('.qd-deeds-toggle');
-  function apply() {
-    document.body.classList.toggle('hide-done-deeds', !!state.hideDoneDeeds);
-    if (btn) {
-      btn.classList.toggle('on', !!state.hideDoneDeeds);
-      btn.setAttribute('aria-pressed', state.hideDoneDeeds ? 'true' : 'false');
+  var defaultQid = {{{default_quest_json}}};
+  var params = new URLSearchParams(location.search);
+  var requested = params.get('q') || defaultQid;
+  function activate(qid) {
+    var blocks = document.querySelectorAll('.qd-quest-block');
+    var found = null;
+    blocks.forEach(function(b) {
+      if (b.getAttribute('data-quest-id') === qid) {
+        b.classList.add('qd-active'); found = b;
+      } else {
+        b.classList.remove('qd-active');
+      }
+    });
+    if (!found && blocks.length) {
+      blocks[0].classList.add('qd-active'); found = blocks[0];
     }
-  }
-  if (btn) {
-    btn.addEventListener('click', function() {
-      state.hideDoneDeeds = !state.hideDoneDeeds;
-      save(state); apply();
+    if (found) {
+      var name = found.getAttribute('data-quest-name') || '';
+      var n = found.getAttribute('data-quest-n') || '';
+      if (name) document.title = (document.title.split(' — ')[0]) + ' — Chapter ' + n + ': ' + name;
+    }
+    document.querySelectorAll('.qd-active-picker a').forEach(function(a) {
+      a.classList.toggle('qd-active-picker-current', a.getAttribute('data-qid') === qid);
     });
   }
-  apply();
+  activate(requested);
+
+  var FILTER_KEY = 'qd-filter-' + pid;
+  function loadFilter() {
+    try { return JSON.parse(localStorage.getItem(FILTER_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveFilter(s) {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var fState = loadFilter();
+  function applyFilter() {
+    document.body.classList.toggle('hide-done-deeds', !!fState.hideDoneDeeds);
+    document.querySelectorAll('.qd-deeds-toggle').forEach(function(btn) {
+      btn.classList.toggle('on', !!fState.hideDoneDeeds);
+      btn.setAttribute('aria-pressed', fState.hideDoneDeeds ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.qd-deeds-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      fState.hideDoneDeeds = !fState.hideDoneDeeds;
+      saveFilter(fState); applyFilter();
+    });
+  });
+  applyFilter();
+
+  function collapseKey(qid, section) {
+    return 'qd-collapse-' + pid + '-' + qid + '-' + section;
+  }
+  document.querySelectorAll('details[data-qd-collapse]').forEach(function(det) {
+    var section = det.getAttribute('data-qd-collapse');
+    var qBlock = det.closest('.qd-quest-block');
+    var qid = qBlock ? qBlock.getAttribute('data-quest-id') : 'default';
+    var k = collapseKey(qid, section);
+    var stored = null;
+    try { stored = localStorage.getItem(k); } catch (e) {}
+    if (stored === 'open') det.open = true;
+    else if (stored === 'closed') det.open = false;
+    det.addEventListener('toggle', function() {
+      try { localStorage.setItem(k, det.open ? 'open' : 'closed'); } catch (e) {}
+    });
+  });
 })();
 </script>
 </body>

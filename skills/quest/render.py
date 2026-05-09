@@ -30,6 +30,22 @@ THEMES = ROOT / "skills" / "quest" / "themes"
 
 VIEWS = ["route", "quest-log", "plan-card"]
 
+# Quest fields that should be visible at project scope when rendering a plan-card
+# block for that quest (so partials like _taskslist can reference {{tasks}} etc.).
+HOISTED_QUEST_FIELDS = (
+    "tasks", "tasks_done", "tasks_total", "tasks_next",
+    "tasks_user", "tasks_user_done", "tasks_user_total", "tasks_user_next",
+    "actions", "actions_done", "actions_total", "actions_next", "actions_next3", "actions_empty",
+    "actions_user", "actions_user_done", "actions_user_total", "actions_user_next", "actions_user_next3", "actions_user_empty",
+    "branch", "last_commit",
+    "last_touched", "last_touched_human", "why", "blockers_str",
+    "tags_str", "kpi", "depends_on", "depends_on_str", "depends_on_html",
+    "successors_str", "successors_html", "plans_html", "plans_count",
+    "dep_blocked",
+    "links", "effort", "problem", "solution",
+    "next_step_problem", "next_step_solution",
+)
+
 
 def load_data() -> dict:
     return json.loads(DATA.read_text(encoding="utf-8"))
@@ -130,7 +146,29 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
 
     # Per-quest derivations
     for q in quests:
-        q["status_class"] = q.get("status", "locked")
+        status = q.get("status", "locked")
+        q["status_class"] = status
+        q["status_pretty"] = {"current": "ACTIVE", "done": "VISITED", "locked": "SEALED"}.get(
+            status, status.upper()
+        )
+        # Boolean flags so templates can {{#if active.is_current}} pick the right
+        # icon partial — the partial system can't pick by string value.
+        q["is_current"] = status == "current"
+        q["is_done"]    = status == "done"
+        q["is_locked"]  = status == "locked"
+        # Display title — "Quest Name (session-name)" when a session has claimed
+        # this quest with a label that differs from the quest id. Last-claimer
+        # wins (rare collision). Empty/no-claim → just the quest name.
+        sname = (q.get("claimed_session_name") or "").strip()
+        if sname:
+            kebab = re.sub(r"[^a-z0-9]+", "-", sname.lower()).strip("-")
+            if kebab and kebab != q.get("id", ""):
+                q["display_name"] = f"{q.get('name', '')} ({sname})"
+                q["session_name_suffix"] = sname
+            else:
+                q["display_name"] = q.get("name", "")
+        else:
+            q["display_name"] = q.get("name", "")
         q["progress_pct"] = int(100 * q.get("progress", 0))
         q["xp_str"] = f"+{q.get('xp_reward', 25)} XP"
         q["roman"] = roman(q.get("n", 0))
@@ -165,6 +203,113 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
                     t["no_brief"] = True
             q["tasks_done"] = sum(1 for t in tasks if t.get("done"))
             q["tasks_total"] = len(tasks)
+            # First not-done task title — used as collapsed-summary preview
+            next_task = next((t for t in tasks if not t.get("done")), None)
+            if next_task:
+                title = next_task.get("title", "")
+                q["tasks_next"] = title[:80] + ("…" if len(title) > 80 else "")
+        # Rich action items (new format — `### N. Title [STATUS]` from §13/§14).
+        # Two parallel arrays: actions (Claude's actions) + actions_user (Yatir's).
+        # Each item has {n, title, status, status_class, body_html}.
+        # SYNTHESIS: legacy quests with tasks[] but no actions[] get auto-converted
+        # so the rich UI shows for ALL quests. Synthesised actions have:
+        #   - title from task title
+        #   - status TODO/DONE based on done bool
+        #   - body_html from problem/solution/brief sub-bullets if present
+        # When synthesis fires, the legacy tasks/_taskslist section is suppressed
+        # in _quest_scope to avoid duplicate rendering.
+        if q.get("tasks") and not q.get("actions"):
+            synth = []
+            for i, t in enumerate(q["tasks"], start=1):
+                done = bool(t.get("done"))
+                body_parts = []
+                if t.get("problem"):
+                    body_parts.append(f"<p><strong>Problem:</strong> {html.escape(t['problem'])}</p>")
+                if t.get("solution"):
+                    body_parts.append(f"<p><strong>Solution:</strong> {html.escape(t['solution'])}</p>")
+                if t.get("brief") and not (t.get("problem") or t.get("solution")):
+                    body_parts.append(f"<p>{html.escape(t['brief'])}</p>")
+                synth.append({
+                    "n": i,
+                    "title": t.get("title", "")[:200],
+                    "status": "DONE" if done else "TODO",
+                    "status_class": "done" if done else "todo",
+                    "body_html": "".join(body_parts),
+                })
+            q["actions"] = synth
+            q["actions_synthesized"] = True  # signals to _quest_scope to drop legacy `tasks`
+
+        if q.get("tasks_user") and not q.get("actions_user"):
+            synth = []
+            for i, t in enumerate(q["tasks_user"], start=1):
+                done = bool(t.get("done"))
+                body_parts = []
+                if t.get("problem"):
+                    body_parts.append(f"<p><strong>Problem:</strong> {html.escape(t['problem'])}</p>")
+                if t.get("solution"):
+                    body_parts.append(f"<p><strong>Solution:</strong> {html.escape(t['solution'])}</p>")
+                if t.get("brief") and not (t.get("problem") or t.get("solution")):
+                    body_parts.append(f"<p>{html.escape(t['brief'])}</p>")
+                synth.append({
+                    "n": i,
+                    "title": t.get("title", "")[:200],
+                    "status": "DONE" if done else "TODO",
+                    "status_class": "done" if done else "todo",
+                    "body_html": "".join(body_parts),
+                })
+            q["actions_user"] = synth
+            q["actions_user_synthesized"] = True
+
+        # Empty-state flags — when one side has actions but the other doesn't,
+        # the missing section's empty-state placeholder renders so authors
+        # discover §14 / §13 conventions for the next plan revision.
+        has_cc = bool(q.get("actions"))
+        has_user = bool(q.get("actions_user"))
+        if has_cc and not has_user:
+            q["actions_user_empty"] = True
+        if has_user and not has_cc:
+            q["actions_empty"] = True
+
+        for arr_name, count_prefix in (("actions", "actions"), ("actions_user", "actions_user")):
+            arr = q.get(arr_name, [])
+            if arr:
+                q[f"{count_prefix}_done"] = sum(1 for a in arr if a.get("status_class") == "done")
+                q[f"{count_prefix}_total"] = len(arr)
+                # First not-done action title — single-line summary preview
+                not_done = [a for a in arr if a.get("status_class") != "done"]
+                if not_done:
+                    title = not_done[0].get("title", "")
+                    q[f"{count_prefix}_next"] = title[:80] + ("…" if len(title) > 80 else "")
+                # Next 3 not-done items — compact peek list shown inside the
+                # collapsed <summary>. Shallow copies with truncated titles so
+                # the peek view never wraps awkwardly.
+                next3 = []
+                for a in not_done[:3]:
+                    title = a.get("title", "")
+                    next3.append({
+                        "n": a.get("n"),
+                        "title": title[:90] + ("…" if len(title) > 90 else ""),
+                        "status": a.get("status", ""),
+                        "status_class": a.get("status_class", "default"),
+                    })
+                if next3:
+                    q[f"{count_prefix}_next3"] = next3
+        # User-actor tasks (legacy §14 checkbox; preserved for back-compat)
+        user_tasks = q.get("tasks_user", [])
+        if user_tasks:
+            for t in user_tasks:
+                t["done_class"] = "done" if t.get("done") else "todo"
+                t["done_mark"] = "✓" if t.get("done") else "○"
+                if t.get("problem") or t.get("solution") or t.get("brief"):
+                    t["has_brief"] = True
+                else:
+                    t["no_brief"] = True
+            q["tasks_user_done"] = sum(1 for t in user_tasks if t.get("done"))
+            q["tasks_user_total"] = len(user_tasks)
+            next_user = next((t for t in user_tasks if not t.get("done")), None)
+            if next_user:
+                title = next_user.get("title", "")
+                q["tasks_user_next"] = title[:80] + ("…" if len(title) > 80 else "")
         # Human-readable last-touched timestamp
         if q.get("last_touched"):
             q["last_touched_human"] = humanize_iso(q["last_touched"])
@@ -248,16 +393,12 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
             q["plans_html"] = " ".join(chips)
             q["plans_count"] = len(plan_files)
 
-    # Hoist active quest's v2 fields onto project scope so plan-card partials
-    # (which run at project scope) can reference {{tasks}}, {{branch}}, etc.
+    # Hoist FIRST-current quest's v2 fields onto project scope. Used by route +
+    # quest-log views (which still render against project scope). Plan-card no
+    # longer relies on this hoist — render_project builds per-quest scopes via
+    # _quest_scope() so each quest's plan-card block sees its own data.
     if active:
-        for k in ("tasks", "tasks_done", "tasks_total", "branch", "last_commit",
-                  "last_touched", "last_touched_human", "why", "blockers_str",
-                  "tags_str", "kpi", "depends_on", "depends_on_str", "depends_on_html",
-                  "successors_str", "successors_html", "plans_html", "plans_count",
-                  "dep_blocked",
-                  "links", "effort", "problem", "solution",
-                  "next_step_problem", "next_step_solution"):
+        for k in HOISTED_QUEST_FIELDS:
             if k in active:
                 project[k] = active[k]
         project["progress_pct"] = int(100 * active.get("progress", 0))
@@ -284,7 +425,7 @@ _EACH = re.compile(r"\{\{#each\s+([\w.]+)\}\}(.*?)\{\{/each\}\}", re.DOTALL)
 # Tempered-token body excludes nested {{#if so inner ifs match first.
 # The while-loop in _expand_if then peels outer layers.
 _IF = re.compile(r"\{\{#if\s+([\w.]+)\}\}((?:(?!\{\{#if\s).)*?)\{\{/if\}\}", re.DOTALL)
-_PARTIAL = re.compile(r"\{\{>\s*([\w.-]+)\s*\}\}")
+_PARTIAL = re.compile(r"\{\{>\s*([\w./-]+)\s*\}\}")
 
 
 def _truthy(val) -> bool:
@@ -414,12 +555,123 @@ def _render(template: str, scope: dict, theme: str = "pokemon") -> str:
 # ---- top-level rendering ----
 
 
+def _quest_scope(project: dict, q: dict) -> dict:
+    """Build a render scope for ONE quest's plan-card block. Project-level
+    fields stay accessible; `active` is set to this quest; v2 fields hoist
+    from this quest onto the scope so partials like _taskslist resolve.
+    Does NOT mutate `project`."""
+    scope = dict(project)
+    scope["active"] = q
+    scope["active_progress_pct"] = int(100 * q.get("progress", 0))
+    # First, drop ALL hoisted fields from project scope so this quest's block
+    # doesn't accidentally inherit the first-current quest's data.
+    for k in HOISTED_QUEST_FIELDS:
+        scope.pop(k, None)
+    # Then, hoist THIS quest's fields onto the scope.
+    for k in HOISTED_QUEST_FIELDS:
+        if k in q:
+            scope[k] = q[k]
+    # When actions[] was synthesized from tasks[], drop tasks from scope so the
+    # legacy _taskslist partial doesn't render a duplicate "Deeds" section.
+    # Same for tasks_user.
+    if q.get("actions_synthesized"):
+        scope.pop("tasks", None)
+        scope.pop("tasks_done", None)
+        scope.pop("tasks_total", None)
+        scope.pop("tasks_next", None)
+    if q.get("actions_user_synthesized"):
+        scope.pop("tasks_user", None)
+        scope.pop("tasks_user_done", None)
+        scope.pop("tasks_user_total", None)
+        scope.pop("tasks_user_next", None)
+    scope["progress_pct"] = int(100 * q.get("progress", 0))
+    return scope
+
+
+def _render_quest_blocks(project: dict, theme: str) -> tuple[str, str, str]:
+    """Render the per-quest plan-card body N times — one per quest in the
+    project. Each block is wrapped in <article class="qd-quest-block"
+    data-quest-id="..."> so the outer plan-card.html JS can show/hide based
+    on `?q=<id>`.
+
+    Returns (quest_blocks_html, active_picker_html, default_quest_id_json).
+    `default_quest_id_json` is a JSON-string literal for embedding in the
+    JS dispatcher (always quoted, even when empty)."""
+    body_tmpl_path = THEMES / theme / "_plan-card-quest.html.tmpl"
+    if not body_tmpl_path.exists():
+        return (
+            f"<!-- missing per-quest body template: themes/{theme}/_plan-card-quest.html.tmpl -->",
+            "",
+            json.dumps(""),
+        )
+    body_tmpl = body_tmpl_path.read_text(encoding="utf-8")
+
+    quests = project.get("quests", [])
+    blocks: list[str] = []
+    for q in quests:
+        scope = _quest_scope(project, q)
+        body = _render(body_tmpl, scope, theme)
+        qid = q.get("id", "")
+        qname = q.get("name", "")
+        qn = q.get("n", "")
+        blocks.append(
+            f'<article class="qd-quest-block" '
+            f'data-quest-id="{html.escape(qid, quote=True)}" '
+            f'data-quest-name="{html.escape(str(qname), quote=True)}" '
+            f'data-quest-n="{html.escape(str(qn), quote=True)}">'
+            f"{body}</article>"
+        )
+
+    # Default = first current quest (matches original single-active behaviour).
+    default_q = next((q for q in quests if q.get("status") == "current"), None) or (
+        quests[0] if quests else None
+    )
+    default_qid = default_q.get("id", "") if default_q else ""
+
+    # Active picker — only render if 2+ current quests exist (single-current is
+    # the legacy case and doesn't need a picker bar).
+    currents = [q for q in quests if q.get("status") == "current"]
+    if len(currents) >= 2:
+        items = []
+        for q in currents:
+            qid = html.escape(q.get("id", ""), quote=True)
+            label = html.escape(f"#{q.get('n','?')} {q.get('name','?')}", quote=True)
+            items.append(
+                f'<a href="plan-card.html?q={qid}" data-qid="{qid}">{label}</a>'
+            )
+        picker = (
+            '<nav class="qd-active-picker" aria-label="Active quests">'
+            '<span class="qd-active-picker-label">'
+            f'⚔ {len(currents)} active</span>'
+            '<span class="qd-active-picker-list">'
+            + "".join(items)
+            + "</span></nav>"
+        )
+    else:
+        picker = ""
+
+    return "\n".join(blocks), picker, json.dumps(default_qid)
+
+
 def render_project(project: dict, theme: str) -> dict:
-    """Render all views for one project. Returns {view: html}."""
+    """Render all views for one project. Returns {view: html}.
+
+    Plan-card is special-cased: rendered as an outer shell containing N
+    per-quest blocks (one per quest in the project). The outer JS reads
+    `?q=<id>` and toggles visibility — so all internal hrefs of the form
+    `plan-card.html?q=<id>` resolve to the correct block on a single page."""
     out = {}
     for view in VIEWS:
         tmpl = load_template(theme, view)
-        out[view] = _render(tmpl, project, theme)
+        if view == "plan-card":
+            blocks_html, picker_html, default_qid_json = _render_quest_blocks(project, theme)
+            scope = dict(project)
+            scope["quest_blocks_html"] = blocks_html
+            scope["active_picker_html"] = picker_html
+            scope["default_quest_json"] = default_qid_json
+            out[view] = _render(tmpl, scope, theme)
+        else:
+            out[view] = _render(tmpl, project, theme)
     return out
 
 
@@ -487,7 +739,8 @@ def precompute_global_index(data: dict) -> dict:
             "done":    sum(1 for q in quests if q.get("status") == "done"),
             "locked":  sum(1 for q in quests if q.get("status") == "locked"),
         }
-        active = next((q for q in quests if q.get("status") == "current"), None)
+        currents = [q for q in quests if q.get("status") == "current"]
+        active = currents[0] if currents else None
         theme = p.get("theme", "pokemon")
         xp = p.get("xp", {"current": 0, "max": 100})
         xp_max = xp.get("max", 100) or 100
@@ -506,7 +759,26 @@ def precompute_global_index(data: dict) -> dict:
         if icon_svg.startswith("<!-- missing landmark"):
             icon_svg = load_landmark("pokemon", icon_kind)
 
-        active_label = f"#{active.get('n','?')} {active.get('name','?')}" if active else ""
+        # Active label — show first current. When multiple, append "+N more".
+        if active:
+            base = f"#{active.get('n','?')} {active.get('name','?')}"
+            if len(currents) > 1:
+                active_label = f"{base}  ·  +{len(currents) - 1} more"
+            else:
+                active_label = base
+        else:
+            active_label = ""
+        # Full list of currents — used when home-index template wants to render
+        # all (currently we just stuff first + count-suffix into active_label).
+        actives_full = [
+            {
+                "id": q.get("id", ""),
+                "n": q.get("n", "?"),
+                "name": q.get("name", "?"),
+                "label": f"#{q.get('n','?')} {q.get('name','?')}",
+            }
+            for q in currents
+        ]
 
         projects_list.append({
             "id": pid,
@@ -524,6 +796,8 @@ def precompute_global_index(data: dict) -> dict:
             "has_active": active is not None,
             "no_active": active is None,
             "active_label": active_label,
+            "actives": actives_full,
+            "actives_count": len(currents),
             "accent": accent,
             "grass_dark": grass_dark,
             "grass_light": grass_light,

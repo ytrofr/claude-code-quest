@@ -124,6 +124,198 @@ python3 ~/.claude/skills/quest/quest.py update <project> <quest> --clear-links \
 
 Links render via the shared partial `themes/_shared/_links.html.tmpl`; each theme styles them in its own plan-card.html.tmpl. Layout: label · desc · monospace URL (right-aligned on wide screens, stacked on mobile).
 
+### Auto-extraction from plan files
+
+`autosync.py` extracts URLs from plan markdown automatically — you typically don't need `--add-link` if your plan is well-formatted. Two-tier strategy:
+
+1. **Tier 1 (preferred)** — dedicated heading: `## Links` / `## Useful links` / `## Relevant links` / `## See also`. Autosync scans only that section. Format: `- [Label](https://url) — optional description` or bare `https://url` lines. Authors who fill this in get full control over what shows up.
+2. **Tier 2 (fallback)** — when no Links heading exists, autosync scans `## Section 13 — Post-Validation` and `## Section 0.1` for markdown links + bare URLs. These sections commonly carry dashboard/health/deploy URLs.
+
+Auto-extracted links are tagged `source: "autosync"` in `quests.json`. Manual `--add-link` entries (no `source` field, or `source: "manual"`) **survive autosync rewrites** — both coexist on the plan-card. Dedupe by URL (manual wins).
+
+To force a fresh full extract: `--clear-links` removes manual + auto entries; next autosync repopulates from the plan.
+
+## Plan-card sections — Your Actions / Claude's Actions
+
+Plan-card renders TWO flat numbered sections per quest, marked with theme SVG icons (no emojis):
+
+| Section | Source | Icon (pokemon / storybook) | When to use |
+|---|---|---|---|
+| **Your Actions** | `## Section 14 — Your Actions` | trainer cap / quill+inkwell | Things only the human can do — verify in browser, approve PR, hit a dashboard, pick the next track, leave a deploy alone for soak |
+| **Claude's Actions** | `## Section 13 — Post-Validation` | Magnemite-style hovering eye / clockwork eye | Things Claude/the implementation is doing or queued to do — tests, deploys, code changes, undraft PR after soak |
+
+Rendered flat (no collapse — all items always visible). Each item has a numbered badge, title with status pill, and a free-form HTML body (links, code, bold, line breaks).
+
+### Authoring syntax — `### N. Title [STATUS]`
+
+Each action is a level-3 heading under §13 or §14. Number prefix optional (auto-numbered if omitted). Status keyword in `[BRACKETS]` at end of line. Body is everything until the next `###` or `##` heading — supports inline markdown:
+
+```markdown
+## Section 14 — Your Actions
+
+### 1. Eyeball the live editor on production [TODO]
+Open the [Ka'an WC URL](https://example.com/wc) in your authed browser.
+Hover any row → expect `[+ Col] [Layout ▾]` toolbar. Click `+ Col` → expect instant column.
+
+### 2. Verdict — approve or list issues [TODO]
+Tell Claude **"looks good"** OR paste any UX issues you spotted.
+
+### 3. 24h soak window — leave deploy alone [WAITING]
+Kill switch `LAYOUT_HTTP_CLONE_GUARD_ENABLED=true` is armed.
+
+## Section 13 — Post-Validation
+
+### 1. Wait for your eyeball verdict [WAITING]
+No code changes pending until you greenlight. Parked in safe state.
+
+### 2. Undraft `dev-websites → dev` PR [AFTER 24H]
+Bundles `e136ab5` + `c8533d9`. Conditional on: 24h soak clean + your greenlight.
+
+### 3. Update this card on each transition [CONTINUOUS]
+TODO → DONE as items close.
+```
+
+### Status keywords + colour buckets
+
+| Keyword (case-insensitive, free-form) | CSS class | Colour |
+|---|---|---|
+| `TODO` | `todo` | yellow |
+| `DONE`, `COMPLETE`, `COMPLETED` | `done` | green (item title strikethrough + green num badge) |
+| `WAITING`, `BLOCKED` | `waiting` | gray |
+| `QUEUED`, `AFTER ...`, `ON ...` (e.g. `AFTER 24H`, `ON GREENLIGHT`) | `queued` | blue |
+| `CONTINUOUS`, `ONGOING` | `continuous` | teal |
+| Anything else | `default` | neutral |
+
+Display text preserved verbatim — `[AFTER 24H]` shows as "AFTER 24H". Only the colour class is bucketed.
+
+### Inline markdown supported in body
+
+`[label](https://url)` → external link · `` `code` `` → inline code · `**bold**` → strong · `*italic*` → em · single newline → `<br>` · blank line → paragraph break. Anything else is HTML-escaped.
+
+### Legacy `## Section 13/14` checkbox plans
+
+Plans that pre-date this format (using `- [ ]` checkboxes under §13/§14) still parse correctly via fallback — autosync stores them in `tasks[]` / `tasks_user[]` and renders the older collapsible UI. To migrate: delete the checkboxes, replace with `### N. Title [STATUS]` + body. The next autosync swaps the old fields for the new `actions[]` arrays.
+
+## Icon system — modular UI components
+
+Every section-marker glyph on the dashboard resolves through a partial: `{{> icons/<name>}}`. Themes can override per-icon by placing their own version at `themes/<theme>/icons/<name>.html.tmpl`; missing overrides fall back to `themes/_shared/icons/<name>.html.tmpl`. Icons use inline SVG; default styles use `currentColor` so CSS can recolour them.
+
+Built-in icon registry:
+
+| Name | Used for | Pokemon look | Storybook look |
+|---|---|---|---|
+| `user` | Your Actions section header | Trainer cap with pokeball | Quill + inkwell |
+| `robot` | Claude's Actions section header | Magnemite-style hovering eye | Clockwork brass eye |
+| `active` | "Active" status, home-index crest, currently-battling marker | Crossed swords | Wax seal with heraldic mark |
+| `visited` | "Visited" filter button | 5-point star | Illuminated 8-point star |
+| `sealed` | "Sealed" filter button | Padlock | Brass key + lock plate |
+| `branch` | Pill — git branch | shared default fork | shared default fork |
+| `kpi` | Pill — KPI target | shared default bar chart | shared default bar chart |
+| `tags` | Pill — quest tags | shared default tag | shared default tag |
+| `plan-file` | "Plan file" / "Charter" footer | shared default scroll | shared default scroll |
+| `why` | Marker on the "why" motivation line | shared default 8-point spark | shared default 8-point spark |
+
+To add a new icon: drop `themes/_shared/icons/<name>.html.tmpl` (any inline SVG). Reference as `{{> icons/<name>}}`. To override per theme: create `themes/<theme>/icons/<name>.html.tmpl`. To swap an icon's design: edit the SVG file — next render picks it up, no code changes.
+
+## Statusline integration — clickable quest link per session
+
+Every CC session can show a clickable link to its current quest's plan-card in the statusline. Resolution is **hybrid**: an explicit `/quest claim` always wins; otherwise the statusline auto-detects from cwd + most-recently-touched current quest. Falls back to the project home, then the dashboard root.
+
+### Claim commands
+
+```bash
+/quest claim <project> <quest-id>   # bind THIS session to a specific quest
+/quest claim                        # bind to whatever auto-detect would pick (locks it in)
+/quest unclaim                      # remove this session's claim — revert to auto-detect
+/quest claimed                      # show what THIS session is currently claiming
+```
+
+Each session is identified by its `claude` process pid + raw `/proc/<pid>/stat` field-22 starttime ticks (deterministic per CC instance, survives subprocess churn). Claim file lives at `~/.claude/quest/run/session-<claude_pid>-<ticks>.quest` — single line: `<project>/<quest-id>`.
+
+### Statusline display
+
+Output format (last field): `quest:<short-tag>`. The tag is wrapped in an [OSC-8 hyperlink escape](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) so modern terminals (Windows Terminal, iTerm2, kitty, recent VS Code terminal) render it as a clickable link to the full plan-card URL. Clicking jumps straight to the dashboard at `http://localhost:8770/<project>/plan-card.html?q=<quest-id>`.
+
+Tag shortening — long quest ids truncate at 22 chars with `…`:
+
+| Tag | URL it opens |
+|---|---|
+| `quest:ogas/layout-editor-entry-…` | `http://localhost:8770/ogas/plan-card.html?q=layout-editor-entry-435-soak-ship` |
+| `quest:ogas/-` (no current quest) | `http://localhost:8770/ogas/` |
+| `quest:-` (no project from cwd) | `http://localhost:8770/` |
+
+### Recommended SessionEnd hook (auto-unclaim)
+
+Add to `~/.claude/settings.json` if you want claims to clear automatically when a session ends:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 ~/.claude/skills/quest/quest.py unclaim 2>/dev/null || true" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Without this, stale claim files accumulate at `~/.claude/quest/run/session-*.quest` — harmless (each is read only by the matching live session) but accumulates. Periodic prune: `find ~/.claude/quest/run -name 'session-*.quest' -mtime +7 -delete`.
+
+### Bare terminal (no OSC-8 support)
+
+If your terminal renders `\e]8;;…` literally instead of as a link, set `QUEST_STATUSLINE_NO_OSC8=1` in `~/.bashrc` — the statusline drops the escape wrapping and emits just the plain tag.
+
+### Short terminals — single-line compact mode
+
+If your terminal is short (less than ~30 visual rows), CC's bottom-bar may squeeze the second statusline line off-screen and you'll only see line 1. Two fixes:
+
+**Easy fix: resize the terminal taller** (and slightly wider). CC needs ~3-4 free rows below the prompt for the dividers, statusline, permissions banner, and token count.
+
+**Alternative — single-line compact mode**: set `STATUSLINE_COMPACT=1` in your shell environment. The statusline collapses everything onto one line; the plaintext URL trailer is stripped (the quest tag remains clickable via OSC-8 on supported terminals).
+
+```bash
+# Per-session:
+STATUSLINE_COMPACT=1 claude --name my-quest
+
+# Permanent in ~/.bashrc:
+export STATUSLINE_COMPACT=1
+```
+
+Output comparison:
+
+```
+# Default (2-line — requires ~30+ row terminal):
+AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1
+quest: smith/whatsapp-auth-split · audit-gap-closure  →  http://localhost:8770/...
+
+# Compact (1-line — fits any terminal):
+AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1 | quest: smith/whatsapp-auth-split · audit-gap-closure
+```
+
+### Files involved
+
+| File | Purpose |
+|---|---|
+| `~/.claude/scripts/statusline-quest.sh` | Bash helper — `quest_indicator <cwd>` function |
+| `~/.claude/scripts/statusline.sh` | Sources helper, appends `quest:<tag>` field |
+| `~/.claude/skills/quest/quest.py` | `cmd_claim`, `cmd_unclaim`, `cmd_claimed` |
+| `~/.claude/quest/run/session-*.quest` | Per-session claim files (gitignored) |
+
+## Multiple active quests per project
+
+A project can have **any number of quests with `status: "current"`** simultaneously. Renderer:
+
+- **Quest-log** highlights every current quest with the `card.current` class.
+- **Home-index** card shows `#N Name · +K more` when 2+ are active.
+- **Plan-card** emits one `<article class="qd-quest-block" data-quest-id="<id>">` per quest in the project (current + locked + done, all in one HTML file). A small JS dispatcher reads `?q=<id>` from the URL and toggles visibility — defaulting to first current. So `plan-card.html?q=<id>` resolves to the correct quest for any id.
+- When 2+ currents exist, an **active-picker bar** appears at the top of plan-card listing all currents as quick-switch links.
+
+To run multiple plans in parallel, just create them — autosync sets the second new plan to `status: locked` by default. Manually flip it with `/quest update <project> <quest> --status current` (or `/quest done <previous>` then `/quest add` works too).
+
 ## Sequential dependencies
 
 Add `depends_on: [quest-id-1, quest-id-2]` to a quest in JSON (or write `> **Depends on**: id1, id2` in a plan's BLUF block — autosync will pick it up). The renderer surfaces this in two places:

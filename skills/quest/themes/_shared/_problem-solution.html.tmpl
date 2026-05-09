@@ -1,0 +1,11 @@
+<!-- Partial: _problem-solution
+     Scope keys used: problem, solution
+     Renders Problem→Solution lines under quest brief with theme SVG icons.
+     Each line independent. Both icons override-able per theme via icons/problem
+     and icons/solution. -->
+{{#if problem}}
+<p class="qd-brief-line qd-brief-problem"><span class="qd-brief-icon">{{> icons/problem}}</span><strong>Problem:</strong> {{problem}}</p>
+{{/if}}
+{{#if solution}}
+<p class="qd-brief-line qd-brief-solution"><span class="qd-brief-icon">{{> icons/solution}}</span><strong>Solution:</strong> {{solution}}</p>
+{{/if}}

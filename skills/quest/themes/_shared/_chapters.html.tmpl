@@ -1,0 +1,14 @@
+<!-- Partial: _chapters
+     Scope keys used: chapters_list (list of {name, count}), has_chapters (bool)
+     Renders compact "Past chapters" badge — links not yet implemented. -->
+{{#if has_chapters}}
+<div class="qd-chapters" title="Archived chapters from previous adventures">
+  <span class="qd-chapters-mark" aria-hidden="true">{{> icons/plan-file}}</span>
+  <span class="qd-chapters-label">Past chapters:</span>
+  <span class="qd-chapters-list">
+    {{#each chapters_list}}
+    <span class="qd-chapter-pill">{{q.name}} ({{q.count}})</span>
+    {{/each}}
+  </span>
+</div>
+{{/if}}
