@@ -1,0 +1,22 @@
+<!-- Partial: _links
+     Scope keys used: links (list of {url, label, desc})
+     `links` is hoisted from active.links by render.py.
+     Renders a Links section on the plan card with one row per entry:
+     clickable label + optional one-line description + dimmed URL.
+     Skips render entirely when links is empty/missing. -->
+{{#if links}}
+<section class="qd-links" data-qd="links">
+  <h3 class="qd-links-title">Links</h3>
+  <ul class="qd-links-list">
+    {{#each links}}
+    <li class="qd-link">
+      <a class="qd-link-anchor" href="{{q.url}}" target="_blank" rel="noopener">
+        <span class="qd-link-label">{{q.label}}</span>
+        {{#if q.desc}}<span class="qd-link-desc">{{q.desc}}</span>{{/if}}
+        <span class="qd-link-url">{{q.url}}</span>
+      </a>
+    </li>
+    {{/each}}
+  </ul>
+</section>
+{{/if}}

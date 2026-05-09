@@ -19,7 +19,7 @@ Visualize your projects as gamified RPG maps. Each project gets a themed dashboa
 | `/quest status` | Print all projects, dashboard URL, theme list |
 | `/quest init <project>` | Create new project entry |
 | `/quest add <project> "<name>"` | Append a quest |
-| `/quest update <project> <quest>` | Patch progress, next step, name, etc. |
+| `/quest update <project> <quest>` | Patch progress, next step, name, links, etc. |
 | `/quest done <project> <quest>` | Mark done; awards XP; promotes next locked → current |
 | `/quest theme <project> <theme>` | Swap theme (e.g. pokemon ↔ storybook) |
 | `/quest style <project> --accent <#hex> --icon <name>` | Set the home-index card accent color and landmark icon (per-project override) |
@@ -38,6 +38,10 @@ python3 ~/.claude/skills/quest/quest.py status
 python3 ~/.claude/skills/quest/quest.py init apollo
 python3 ~/.claude/skills/quest/quest.py add apollo "Build login flow" --landmark tower --plan apollo-login.md --next "wire OAuth callback"
 python3 ~/.claude/skills/quest/quest.py update apollo build-login --progress 0.8 --next "ship to staging"
+python3 ~/.claude/skills/quest/quest.py update apollo build-login \
+  --add-link "https://staging.example.com/login|Staging login|Hit this after deploy to verify" \
+  --add-link "https://github.com/me/apollo/pull/42|PR #42|Auth flow changes"
+python3 ~/.claude/skills/quest/quest.py update apollo build-login --clear-links
 python3 ~/.claude/skills/quest/quest.py done apollo build-login
 python3 ~/.claude/skills/quest/quest.py theme apollo storybook
 python3 ~/.claude/skills/quest/quest.py style apollo --accent "#3aaa6a" --icon castle
@@ -87,6 +91,38 @@ python3 ~/.claude/skills/quest/quest.py style apollo --accent "" --icon ""
 The header crown bar shows aggregate **Levels / Total XP / Routes Cleared / Active Battles** summed across every project.
 
 Implementation: template at `~/.claude/skills/quest/themes/_shared/global-index.html.tmpl`; scope built by `precompute_global_index()` in `render.py`. No partials — pure top-level template.
+
+## Quest links — useful URLs on the plan card
+
+Each quest can carry an array of links rendered as a **Links section** on the plan card. Each entry is `{url, label, desc}`. Use this for: deploy URLs, dashboard URLs, PR/issue links, monitoring panels, related plan files — anything someone resuming the quest needs one-click access to.
+
+**Add links** via repeatable `--add-link "URL|LABEL|DESC"`:
+
+```bash
+python3 ~/.claude/skills/quest/quest.py update <project> <quest> \
+  --add-link "https://localhost:8080/digest|Live digest|The actual feature" \
+  --add-link "https://github.com/me/repo/pull/42|PR #42|Code review"
+```
+
+Format: `URL|LABEL|DESC`. Pipes split into 3 fields; LABEL and DESC are optional (URL alone uses URL as label).
+
+**Clear before re-adding** (avoids accumulating stale entries):
+
+```bash
+python3 ~/.claude/skills/quest/quest.py update <project> <quest> --clear-links \
+  --add-link "..." --add-link "..."
+```
+
+`--clear-links` runs first, then `--add-link` entries replace what was there.
+
+**The routine — when to add links**:
+- After shipping a feature: deploy URL, dashboard, KPI endpoint
+- After opening a PR: PR URL + linked issue
+- When parking a quest mid-flight: status URL, last good build, related Slack thread
+- Any quest with a "go look at X" verification step — make X a one-click link
+- Cross-references: related quests, related plan files, parent epic
+
+Links render via the shared partial `themes/_shared/_links.html.tmpl`; each theme styles them in its own plan-card.html.tmpl. Layout: label · desc · monospace URL (right-aligned on wide screens, stacked on mobile).
 
 ## Sequential dependencies
 
@@ -144,7 +180,9 @@ If a plan file is new (no matching quest exists), autosync ADDS a quest. If it m
           "tags": ["auth", "core"],
           "kpi": "login success rate >99%",
           "depends_on": [],
-          "links": [],
+          "links": [
+            {"url": "https://example.com", "label": "Display name", "desc": "Optional one-line description"}
+          ],
           "effort": {"estimate_hr": 4, "actual_hr": 2}
         }
       ]
@@ -153,7 +191,7 @@ If a plan file is new (no matching quest exists), autosync ADDS a quest. If it m
 }
 ```
 
-**Fields you'll touch via commands**: `name`, `desc`, `landmark`, `status` (done/current/locked), `progress` (0.0-1.0), `next_step`, `plan`, `theme`, `accent`, `icon`. Never hand-edit the JSON; use the commands.
+**Fields you'll touch via commands**: `name`, `desc`, `landmark`, `status` (done/current/locked), `progress` (0.0-1.0), `next_step`, `plan`, `theme`, `accent`, `icon`, `links` (via `--add-link` / `--clear-links`). Never hand-edit the JSON; use the commands.
 
 **Project-level home-index fields** (both optional, both have defaults):
 - `accent` — 6-digit hex (e.g. `#ff6a3a`) used for the hero strip foreground hill, the lightened sky tint, and the colored progress accents on the home-index card. Per-pid defaults in `render.py::DEFAULT_ACCENTS`. Override via `/quest style <project> --accent <#hex>`.
@@ -163,7 +201,7 @@ If a plan file is new (no matching quest exists), autosync ADDS a quest. If it m
 
 - Themes live at `~/.claude/skills/quest/themes/<name>/`
 - Each theme provides 3 templates (`route.html.tmpl`, `quest-log.html.tmpl`, `plan-card.html.tmpl`), 7 landmark SVGs (`landmarks/{house,tower,mill,bridge,camp,cave,castle}.svg.tmpl`), and a `theme.json`.
-- Shared partials at `themes/_shared/` (`_back-link`, `_taskslist`, `_meta-row`, `_progress-bar`). Themes can override by placing same-named file in their dir.
+- Shared partials at `themes/_shared/` (`_back-link`, `_taskslist`, `_meta-row`, `_progress-bar`, `_links`). Themes can override by placing same-named file in their dir.
 - To add a new theme: drop a folder, no code changes. See `themes/README.md`.
 
 ## Configuration (project path map)

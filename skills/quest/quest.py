@@ -186,6 +186,20 @@ def cmd_update(args) -> int:
                     q["status"] = "locked"
         quest["status"] = args.status
         changes.append(f"status={args.status}")
+    if getattr(args, "clear_links", False):
+        quest["links"] = []
+        changes.append("links=cleared")
+    if getattr(args, "add_link", None):
+        quest.setdefault("links", [])
+        for spec in args.add_link:
+            parts = spec.split("|", 2)
+            url = parts[0].strip()
+            if not url:
+                sys.exit("ERROR: --add-link requires a URL (got empty string before |)")
+            label = parts[1].strip() if len(parts) > 1 and parts[1].strip() else url
+            desc = parts[2].strip() if len(parts) > 2 else ""
+            quest["links"].append({"url": url, "label": label, "desc": desc})
+        changes.append(f"links+={len(args.add_link)}")
     save(data)
     print(f"Updated {args.project_id}/{args.quest_id}: {', '.join(changes) if changes else '(no changes)'}")
     return render_now()
@@ -429,6 +443,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--desc")
     s.add_argument("--landmark", choices=LANDMARKS)
     s.add_argument("--status", choices=["done", "current", "locked"])
+    s.add_argument(
+        "--add-link",
+        dest="add_link",
+        action="append",
+        default=None,
+        metavar="URL|LABEL|DESC",
+        help='Append a link entry. Format: "URL|LABEL|DESC" (LABEL and DESC optional). Repeatable.',
+    )
+    s.add_argument(
+        "--clear-links",
+        dest="clear_links",
+        action="store_true",
+        help="Remove all link entries from this quest.",
+    )
     s.set_defaults(func=cmd_update)
 
     s = sub.add_parser("done", help="Mark a quest done; awards XP, may promote next")
