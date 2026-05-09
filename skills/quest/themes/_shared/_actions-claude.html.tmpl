@@ -25,6 +25,10 @@
         <span class="qd-actions-icon">{{> icons/robot}}</span>
         <h3 class="qd-actions-title">Claude's Actions</h3>
         <span class="qd-actions-count">{{actions_done}} / {{actions_total}}</span>
+        <button type="button" class="qd-actions-hide-done" data-qd-hide-done="cc" aria-pressed="false" title="Hide completed actions">
+          <span class="qd-actions-hide-done-mark" aria-hidden="true">✓</span>
+          <span class="qd-actions-hide-done-label">Hide done</span>
+        </button>
       </div>
       {{#if actions_next3}}
       <ol class="qd-actions-summary-next3">

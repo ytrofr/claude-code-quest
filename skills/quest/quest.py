@@ -235,6 +235,12 @@ def cmd_update(args) -> int:
     if args.desc is not None:
         quest["desc"] = args.desc
         changes.append("desc")
+    if getattr(args, "problem", None) is not None:
+        quest["problem"] = args.problem
+        changes.append("problem")
+    if getattr(args, "solution", None) is not None:
+        quest["solution"] = args.solution
+        changes.append("solution")
     if args.landmark is not None:
         if args.landmark not in LANDMARKS:
             sys.exit(f"ERROR: landmark must be one of {LANDMARKS}")
@@ -689,6 +695,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--next")
     s.add_argument("--name")
     s.add_argument("--desc")
+    s.add_argument(
+        "--problem",
+        help="Plain-language Problem statement shown on the plan card. Keep it human-friendly — no jargon, no commit SHAs, no internal acronyms. Pass empty string to clear.",
+    )
+    s.add_argument(
+        "--solution",
+        help="Plain-language Solution statement shown on the plan card. Same rules as --problem.",
+    )
     s.add_argument("--landmark", choices=LANDMARKS)
     s.add_argument("--status", choices=["done", "current", "locked"])
     s.add_argument(
