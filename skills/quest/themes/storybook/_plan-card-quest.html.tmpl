@@ -86,7 +86,7 @@
 
       {{> _meta-row}}
 
-      <p class="margin"><span class="qd-meta-icon">{{> icons/plan-file}}</span> Charter: <code>~/.claude/plans/{{active.plan}}</code></p>
+      {{#if active.plan}}<p class="margin"><span class="qd-meta-icon">{{> icons/plan-file}}</span> Charter: <code>~/.claude/plans/{{active.plan}}</code></p>{{/if}}
 
       <div class="actions">
         <a class="btn primary" href="#">Resume the Quest</a>

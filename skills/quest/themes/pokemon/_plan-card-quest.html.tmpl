@@ -105,7 +105,7 @@
         <a class="btn ghost" href="quest-log.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg> Back to Log</a>
       </div>
 
-      <p class="meta-line"><span class="qd-meta-icon">{{> icons/plan-file}}</span> Plan file: <code>~/.claude/plans/{{active.plan}}</code></p>
+      {{#if active.plan}}<p class="meta-line"><span class="qd-meta-icon">{{> icons/plan-file}}</span> Plan file: <code>~/.claude/plans/{{active.plan}}</code></p>{{/if}}
     </div>
   </div>
 </div>

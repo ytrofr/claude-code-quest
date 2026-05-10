@@ -2,6 +2,17 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.6.2] — 2026-05-10
+
+Plan-card render bug fixes surfaced by real quest data.
+
+### Fixed
+
+- **Empty `Plan file:` footer** when a quest's `plan` field is `""` — the per-quest template emitted `Plan file: ~/.claude/plans/` with nothing after the slash. Now wrapped in `{{#if active.plan}}` so the line is omitted entirely when no plan is set. Both pokemon and storybook themes.
+- **Literal `{{q.url}}` / `{{q.label}}` template tokens** rendered in the Links section when a quest stored `links` as bare strings instead of `{url, label, desc}` objects. `render.py` now normalizes every link entry: dicts pass through with safe field fallbacks; strings become `{url, label, desc: ""}` so the partial's `{{#each}}` body resolves cleanly.
+- **X-axis overflow on plan-card** when KPI text was a 300+ char sentence. The KPI lived in a `.qd-pill` with `white-space: nowrap`; without `min-width: 0` the flex item refused to shrink and pushed the card past the 1280px frame. Fix in both themes: pills now allow flex shrink, and `.qd-pill-kpi` uses `white-space: normal` + `overflow-wrap: anywhere` so long KPI sentences wrap to multiple lines instead of clipping or overflowing.
+- **Long unbroken URL paths** in `.qd-link-label` (e.g. `~/shared/inter-agent/active/audit-gap-closure-launch-20260509.md`) caused horizontal overflow because the grid column was `1fr` (which won't shrink unbreakable tokens) and the label had no overflow handling. Both themes now use `grid-template-columns: minmax(0, 1fr) auto` and the label has `min-width: 0; overflow-wrap: anywhere; word-break: break-word`.
+
 ## [1.6.1] — 2026-05-09
 
 Plan-card readability + ergonomics polish.
