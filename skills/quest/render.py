@@ -272,6 +272,8 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
 
         for arr_name, count_prefix in (("actions", "actions"), ("actions_user", "actions_user")):
             arr = q.get(arr_name, [])
+            # Defensive: legacy data may have string entries; coerce to dict shape
+            arr = [a if isinstance(a, dict) else {"title": str(a), "status_class": "todo"} for a in arr]
             if arr:
                 q[f"{count_prefix}_done"] = sum(1 for a in arr if a.get("status_class") == "done")
                 q[f"{count_prefix}_total"] = len(arr)
@@ -313,6 +315,22 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
         # Human-readable last-touched timestamp
         if q.get("last_touched"):
             q["last_touched_human"] = humanize_iso(q["last_touched"])
+        # Normalize links: legacy string entries → {url, label, desc} objects.
+        # Some quests stored bare path strings; template expects dict shape.
+        raw_links = q.get("links")
+        if isinstance(raw_links, list) and raw_links:
+            norm = []
+            for link in raw_links:
+                if isinstance(link, dict):
+                    norm.append({
+                        "url": str(link.get("url", "")),
+                        "label": str(link.get("label") or link.get("url") or ""),
+                        "desc": str(link.get("desc", "")),
+                        "source": link.get("source", ""),
+                    })
+                elif isinstance(link, str) and link.strip():
+                    norm.append({"url": link, "label": link, "desc": "", "source": ""})
+            q["links"] = norm
         # Joined string fields (templates need pre-joined for {{#if}} truthiness)
         if q.get("blockers"):
             q["blockers_str"] = ", ".join(q["blockers"])

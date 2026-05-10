@@ -56,9 +56,9 @@
   .qd-back-link { display: inline-block; padding: 4px 10px; background: #fbf3df; border: 2px solid #4a2e1a; color: #4a2e1a; text-decoration: none; font-family: 'Eczar', serif; font-weight: 700; font-style: normal; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
   .qd-back-link:hover { background: #f3e6c4; }
   .qd-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; font-family: 'Eczar', serif; }
-  .qd-pill { padding: 3px 10px; font-size: 12px; font-weight: 700; color: #4a2e1a; background: #fbf3df; border: 1.5px solid #4a2e1a; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
+  .qd-pill { padding: 3px 10px; font-size: 12px; font-weight: 700; color: #4a2e1a; background: #fbf3df; border: 1.5px solid #4a2e1a; line-height: 1.3; white-space: nowrap; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
   .qd-pill-branch { background: #ede0c0; }
-  .qd-pill-kpi { background: #f0c050; }
+  .qd-pill-kpi { background: #f0c050; white-space: normal; overflow-wrap: anywhere; word-break: break-word; text-overflow: clip; }
   .qd-pill-tags { background: #f3e6c4; font-style: italic; font-weight: 600; }
   .qd-why { margin: 12px 0 0; padding: 10px 14px; background: rgba(196,74,42,0.07); border-left: 3px solid #c44a2a; font-family: 'Eczar', serif; font-size: 15px; font-style: italic; color: #4a2e1a; line-height: 1.5; }
   .qd-why-mark { color: #c44a2a; font-style: normal; margin-right: 6px; }
@@ -120,9 +120,9 @@
   .qd-links-title { margin: 0 0 12px; font-family: 'Eczar', serif; font-weight: 700; font-size: 13px; letter-spacing: 2.5px; color: #4a2e1a; text-transform: uppercase; }
   .qd-links-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
   .qd-link { padding: 0; }
-  .qd-link-anchor { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 4px; padding: 10px 12px; background: #fffdf6; border-bottom: 1px dashed #c89030; text-decoration: none; color: #2a1f15; }
+  .qd-link-anchor { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; row-gap: 4px; padding: 10px 12px; background: #fffdf6; border-bottom: 1px dashed #c89030; text-decoration: none; color: #2a1f15; }
   .qd-link-anchor:hover { background: #fff0c8; border-bottom-style: solid; }
-  .qd-link-label { grid-column: 1; grid-row: 1; font-family: 'Eczar', serif; font-weight: 700; font-size: 15px; color: #c44a2a; align-self: baseline; }
+  .qd-link-label { grid-column: 1; grid-row: 1; font-family: 'Eczar', serif; font-weight: 700; font-size: 15px; color: #c44a2a; align-self: baseline; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .qd-link-url { grid-column: 2; grid-row: 1; font-family: ui-monospace, monospace; font-size: 12px; color: #7a5a3a; text-align: right; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: baseline; }
   .qd-link-desc { grid-column: 1 / -1; grid-row: 2; font-size: 13px; color: #4a2e1a; font-style: italic; }
   @media (max-width: 720px) {
