@@ -27,8 +27,59 @@ ROOT = Path.home() / ".claude"
 DATA = ROOT / "quest" / "data" / "quests.json"
 SITE = ROOT / "quest" / "site"
 THEMES = ROOT / "skills" / "quest" / "themes"
+RUN_DIR = ROOT / "quest" / "run"
 
 VIEWS = ["route", "quest-log", "plan-card"]
+
+
+def _scan_live_claims() -> dict:
+    """Walk ~/.claude/quest/run/*.quest. For each claim file whose pid is still
+    alive (and ticks match — guards against pid reuse), read the .name sidecar
+    if present. Returns: {(project_id, quest_id): [{name, pid}, ...]}.
+
+    Dead claim files (process exited) are silently skipped. Sidecar absence is
+    fine — claim still counts, name is None."""
+    out: dict[tuple, list] = {}
+    if not RUN_DIR.exists():
+        return out
+    for claim_file in RUN_DIR.glob("session-*.quest"):
+        stem = claim_file.stem  # e.g. session-3249-3487
+        try:
+            _, pid_s, ticks_s = stem.split("-", 2)
+            pid = int(pid_s)
+        except (ValueError, AttributeError):
+            continue
+        # Verify process alive AND ticks match (pid-reuse guard)
+        try:
+            stat_path = Path(f"/proc/{pid}/stat")
+            if not stat_path.exists():
+                continue
+            raw = stat_path.read_text()
+            # Strip the (comm) field which can contain spaces / parens
+            after = raw.split(")", 1)[1].strip() if ")" in raw else raw
+            cur_ticks = after.split()[19]  # field 22, 0-indexed after comm strip
+            if cur_ticks != ticks_s:
+                continue
+        except Exception:
+            continue
+        # Parse claim
+        try:
+            claim_txt = claim_file.read_text().strip()
+            project_id, quest_id = claim_txt.split("/", 1)
+        except Exception:
+            continue
+        # Read optional sidecar name
+        name = None
+        sidecar = claim_file.with_suffix(".name")
+        if sidecar.exists():
+            try:
+                n = sidecar.read_text().strip()
+                if n:
+                    name = n
+            except Exception:
+                pass
+        out.setdefault((project_id, quest_id), []).append({"name": name, "pid": pid})
+    return out
 
 # Quest fields that should be visible at project scope when rendering a plan-card
 # block for that quest (so partials like _taskslist can reference {{tasks}} etc.).
@@ -39,11 +90,15 @@ HOISTED_QUEST_FIELDS = (
     "actions_user", "actions_user_done", "actions_user_total", "actions_user_next", "actions_user_next3", "actions_user_empty",
     "branch", "last_commit",
     "last_touched", "last_touched_human", "why", "blockers_str",
-    "tags_str", "kpi", "depends_on", "depends_on_str", "depends_on_html",
+    "tags_str", "tags_pretty", "kpi", "depends_on", "depends_on_str", "depends_on_html",
     "successors_str", "successors_html", "plans_html", "plans_count",
     "dep_blocked",
-    "links", "effort", "problem", "solution",
+    "links", "link_buckets", "effort", "problem", "solution",
     "next_step_problem", "next_step_solution",
+    # 2026-05-13 schema additions for AI-resume briefings
+    "resume_context", "files_touched", "commands", "gotchas", "repo",
+    "briefing_md",  # built server-side; raw-injected into hidden <pre>
+    "live_claims", "live_claims_html", "has_live_claims",  # render-time scan
 )
 
 
@@ -114,7 +169,7 @@ def humanize_iso(iso_str: str) -> str:
         return ""
 
 
-def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
+def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map: dict | None = None) -> dict:
     """Add derived fields used by templates. Mutates and returns project."""
     project["id"] = project_id
 
@@ -144,12 +199,193 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
     # Build id→quest map first (needed for depends_on resolution per quest)
     by_id = {q.get("id", ""): q for q in quests}
 
+    # Categorize each link by URL pattern. Bucket order = display order.
+    _BUCKET_ORDER = ["Try it", "Code & commits", "Learning entries", "Project rules", "Skills", "Plan"]
+
+    def _categorize_link(url: str) -> str:
+        u = (url or "").lower()
+        if "/.claude/skills/" in u or "/claude/skills/" in u:
+            return "Skills"
+        if "/.claude/rules/" in u or "/claude/rules/" in u:
+            return "Project rules"
+        if "/.claude/plans/" in u or "i-want-to-plan-" in u:
+            return "Plan"
+        if "memory-bank/learned/entry-" in u or "/data/audit/" in u:
+            return "Learning entries"
+        if "github.com" in u and ("/commit/" in u or "/pull/" in u or "/blob/" in u):
+            return "Code & commits"
+        return "Try it"
+
+    def _build_link_buckets(links: list) -> list:
+        grouped: dict[str, list] = {name: [] for name in _BUCKET_ORDER}
+        for link in links:
+            grouped[_categorize_link(link.get("url", ""))].append(link)
+        out = []
+        for name in _BUCKET_ORDER:
+            items = grouped[name]
+            if not items:
+                continue
+            # Pre-render <li> rows since template engine doesn't support nested {{#each}}.
+            rows = []
+            for li in items:
+                label = html.escape(li.get("label") or li.get("url") or "")
+                desc = html.escape(li.get("desc") or "")
+                url = html.escape(li.get("url") or "", quote=True)
+                desc_html = f'<span class="qd-link-desc">{desc}</span>' if desc else ""
+                rows.append(
+                    f'<li class="qd-link"><a class="qd-link-anchor" href="{url}" '
+                    f'target="_blank" rel="noopener">'
+                    f'<span class="qd-link-label">{label}</span>{desc_html}</a></li>'
+                )
+            out.append({"name": name, "count": len(items), "links_html": "".join(rows)})
+        return out
+
+    def _build_briefing_md(q: dict, proj_id: str) -> str:
+        """Build a plain-text markdown briefing for a fresh AI / human reader.
+        Empty sections are omitted. Output is plain text (no HTML escaping)."""
+        out: list[str] = []
+        n = q.get("n", "?")
+        name = q.get("name") or q.get("id", "?")
+        out.append(f"# Quest {n} · {name}")
+        out.append("")
+        # Status line
+        meta_parts = [f"**Project**: {proj_id}"]
+        sp = q.get("status_pretty")
+        if sp:
+            meta_parts.append(f"**Status**: {sp}")
+        prog = q.get("progress")
+        if isinstance(prog, (int, float)) and prog > 0:
+            meta_parts.append(f"**Progress**: {int(prog * 100)}%")
+        br = q.get("branch")
+        if br:
+            meta_parts.append(f"**Branch**: {br}")
+        xp = q.get("xp_reward")
+        if xp:
+            meta_parts.append(f"**Reward**: +{xp} XP")
+        out.append(" · ".join(meta_parts))
+        out.append("")
+
+        if q.get("desc"):
+            out.append("## What this is")
+            out.append("")
+            out.append(q["desc"])
+            out.append("")
+        if q.get("why"):
+            out.append("## Why it matters")
+            out.append("")
+            out.append(q["why"])
+            out.append("")
+        if q.get("kpi"):
+            out.append('## Outcome that means "done"')
+            out.append("")
+            out.append(q["kpi"])
+            out.append("")
+
+        # Actions — done first, then todo. Accept dict or string entries.
+        actions = q.get("actions") or []
+        actions = [a for a in actions if isinstance(a, dict)]
+        if actions:
+            def _is_done(a: dict) -> bool:
+                return (
+                    a.get("status") in ("done", "DONE")
+                    or a.get("status_class") == "done"
+                    or a.get("done") is True
+                )
+            done = [a for a in actions if _is_done(a)]
+            todo = [a for a in actions if not _is_done(a)]
+            total = len(actions)
+            if done:
+                out.append(f"## Done so far ({len(done)} of {total})")
+                out.append("")
+                for a in done:
+                    title = a.get("title") or ""
+                    out.append(f"- {title}")
+                out.append("")
+            if todo:
+                out.append(f"## Next steps ({len(todo)} to do)")
+                out.append("")
+                for i, a in enumerate(todo, 1):
+                    title = a.get("title") or ""
+                    out.append(f"{i}. {title}")
+                out.append("")
+        elif q.get("next_step"):
+            out.append("## Next step")
+            out.append("")
+            out.append(q["next_step"])
+            out.append("")
+
+        if q.get("resume_context"):
+            out.append("## Resume context")
+            out.append("")
+            out.append(q["resume_context"])
+            out.append("")
+
+        if q.get("repo"):
+            out.append("## Repo")
+            out.append("")
+            out.append(f"`{q['repo']}`")
+            out.append("")
+
+        files = q.get("files_touched") or []
+        if files:
+            out.append("## Files touched")
+            out.append("")
+            for f in files:
+                if f.get("role"):
+                    out.append(f"- `{f['path']}` — {f['role']}")
+                else:
+                    out.append(f"- `{f['path']}`")
+            out.append("")
+
+        cmds = q.get("commands") or []
+        if cmds:
+            out.append("## Commands")
+            out.append("")
+            for c in cmds:
+                if c.get("purpose"):
+                    out.append(f"- `{c['cmd']}` — {c['purpose']}")
+                else:
+                    out.append(f"- `{c['cmd']}`")
+            out.append("")
+
+        gotchas = q.get("gotchas") or []
+        if gotchas:
+            out.append("## Gotchas (don't repeat)")
+            out.append("")
+            for g in gotchas:
+                out.append(f"- {g}")
+            out.append("")
+
+        # Links: flatten buckets back to a short markdown list
+        buckets = q.get("link_buckets") or []
+        if buckets:
+            out.append("## Links")
+            out.append("")
+            for bucket in buckets:
+                out.append(f"**{bucket['name']}**")
+                # links_html is HTML; pull from original list instead
+            for link in (q.get("links") or []):
+                lbl = link.get("label") or link.get("url", "")
+                u = link.get("url", "")
+                desc = link.get("desc", "")
+                if desc:
+                    out.append(f"- [{lbl}]({u}) — {desc}")
+                else:
+                    out.append(f"- [{lbl}]({u})")
+            out.append("")
+
+        lc = q.get("last_commit") or {}
+        if lc.get("sha"):
+            out.append(f"_Last commit: `{lc['sha']}` — {lc.get('msg', '')}_")
+
+        return "\n".join(out).rstrip() + "\n"
+
     # Per-quest derivations
     for q in quests:
         status = q.get("status", "locked")
         q["status_class"] = status
-        q["status_pretty"] = {"current": "ACTIVE", "done": "VISITED", "locked": "SEALED"}.get(
-            status, status.upper()
+        q["status_pretty"] = {"current": "Active", "done": "Visited", "locked": "Sealed"}.get(
+            status, status.title()
         )
         # Boolean flags so templates can {{#if active.is_current}} pick the right
         # icon partial — the partial system can't pick by string value.
@@ -229,9 +465,12 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
                     body_parts.append(f"<p><strong>Solution:</strong> {html.escape(t['solution'])}</p>")
                 if t.get("brief") and not (t.get("problem") or t.get("solution")):
                     body_parts.append(f"<p>{html.escape(t['brief'])}</p>")
+                # Tasks may use either "title" (new) or "label" (legacy schema) —
+                # accept both so synthesized actions never render with empty titles.
+                title = t.get("title") or t.get("label") or ""
                 synth.append({
                     "n": i,
-                    "title": t.get("title", "")[:200],
+                    "title": str(title)[:200],
                     "status": "DONE" if done else "TODO",
                     "status_class": "done" if done else "todo",
                     "body_html": "".join(body_parts),
@@ -250,9 +489,10 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
                     body_parts.append(f"<p><strong>Solution:</strong> {html.escape(t['solution'])}</p>")
                 if t.get("brief") and not (t.get("problem") or t.get("solution")):
                     body_parts.append(f"<p>{html.escape(t['brief'])}</p>")
+                title = t.get("title") or t.get("label") or ""
                 synth.append({
                     "n": i,
-                    "title": t.get("title", "")[:200],
+                    "title": str(title)[:200],
                     "status": "DONE" if done else "TODO",
                     "status_class": "done" if done else "todo",
                     "body_html": "".join(body_parts),
@@ -331,11 +571,75 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
                 elif isinstance(link, str) and link.strip():
                     norm.append({"url": link, "label": link, "desc": "", "source": ""})
             q["links"] = norm
+            # Group links into buckets by URL pattern. Empty buckets dropped.
+            q["link_buckets"] = _build_link_buckets(norm)
         # Joined string fields (templates need pre-joined for {{#if}} truthiness)
         if q.get("blockers"):
             q["blockers_str"] = ", ".join(q["blockers"])
         if q.get("tags"):
             q["tags_str"] = ", ".join(q["tags"])
+            # Human-readable: hyphens in tag tokens → spaces, joined with " · ".
+            q["tags_pretty"] = " · ".join(t.replace("-", " ") for t in q["tags"])
+
+        # ---- 2026-05-13 NEW FIELDS — normalize and render-friendly forms ----
+        # files_touched: accept "path" string or {path, role} dict.
+        raw_files = q.get("files_touched")
+        if isinstance(raw_files, list) and raw_files:
+            norm_files = []
+            for entry in raw_files:
+                if isinstance(entry, dict) and entry.get("path"):
+                    norm_files.append({
+                        "path": str(entry["path"]),
+                        "role": str(entry.get("role", "")),
+                    })
+                elif isinstance(entry, str) and entry.strip():
+                    norm_files.append({"path": entry.strip(), "role": ""})
+            q["files_touched"] = norm_files
+
+        # commands: accept "cmd" string or {cmd, purpose} dict.
+        raw_cmds = q.get("commands")
+        if isinstance(raw_cmds, list) and raw_cmds:
+            norm_cmds = []
+            for entry in raw_cmds:
+                if isinstance(entry, dict) and entry.get("cmd"):
+                    norm_cmds.append({
+                        "cmd": str(entry["cmd"]),
+                        "purpose": str(entry.get("purpose", "")),
+                    })
+                elif isinstance(entry, str) and entry.strip():
+                    norm_cmds.append({"cmd": entry.strip(), "purpose": ""})
+            q["commands"] = norm_cmds
+
+        # gotchas: list of plain strings, "don't try X — already failed" notes.
+        raw_gotchas = q.get("gotchas")
+        if isinstance(raw_gotchas, list) and raw_gotchas:
+            q["gotchas"] = [str(g).strip() for g in raw_gotchas if str(g).strip()]
+
+        # resume_context: paragraph for fresh AI session. No normalization beyond strip.
+        if isinstance(q.get("resume_context"), str):
+            q["resume_context"] = q["resume_context"].strip()
+
+        # repo: absolute path string.
+        if isinstance(q.get("repo"), str):
+            q["repo"] = q["repo"].strip()
+        # Attach live claims for this quest (computed once per render_all).
+        if live_claims_map is not None:
+            claims = live_claims_map.get((project_id, q.get("id", "")), [])
+            if claims:
+                q["live_claims"] = claims
+                q["has_live_claims"] = True
+                pills = []
+                for c in claims:
+                    name = (c.get("name") or "").strip() or f"pid {c.get('pid')}"
+                    pills.append(
+                        f'<span class="qd-live-claim-pill">{html.escape(name)}</span>'
+                    )
+                q["live_claims_html"] = "".join(pills)
+
+        # Build briefing markdown for the Copy-briefing button + .md endpoint.
+        # Must run AFTER all normalizations above so it captures the final shape.
+        q["briefing_md"] = _build_briefing_md(q, project_id)
+        # ---- end new-fields normalization ----
         # Next-step expandable marker
         if q.get("next_step") and not q.get("next_step_problem"):
             q["no_next_brief"] = True
@@ -394,15 +698,34 @@ def precompute(project_id: str, project: dict, theme_meta: dict) -> dict:
 
         # Plan files — originating `plan` (singular, autosync-set) + optional
         # `plans` array of sub-plans (manually edited or future autosync).
+        # Normalize plan paths to filename only — strips ~/.claude/plans/ and
+        # /home/<user>/.claude/plans/ absolute prefixes so the chip shows just
+        # the filename and the inline "Plan file: ~/.claude/plans/<name>" line
+        # doesn't double-concat the prefix.
+        def _plan_filename(raw: str) -> str:
+            s = str(raw or "").strip()
+            for prefix in ("~/.claude/plans/", "~/.claude/plans"):
+                if s.startswith(prefix):
+                    s = s[len(prefix):].lstrip("/")
+            for prefix in ("/.claude/plans/", "/.claude/plans"):
+                idx = s.find(prefix)
+                if idx >= 0:
+                    s = s[idx + len(prefix):].lstrip("/")
+            return s
+
         plan_files = []
         seen = set()
         if q.get("plan"):
-            plan_files.append(q["plan"])
-            seen.add(q["plan"])
+            normalized = _plan_filename(q["plan"])
+            q["plan"] = normalized  # propagate cleaned form to template
+            if normalized:
+                plan_files.append(normalized)
+                seen.add(normalized)
         for p in (q.get("plans") or []):
-            if p and p not in seen:
-                plan_files.append(p)
-                seen.add(p)
+            np = _plan_filename(p)
+            if np and np not in seen:
+                plan_files.append(np)
+                seen.add(np)
         if plan_files:
             chips = [
                 f'<code class="qd-plan-chip">{html.escape(p, quote=True)}</code>'
@@ -848,20 +1171,52 @@ def render_all() -> int:
     themes = discover_themes()
     SITE.mkdir(parents=True, exist_ok=True)
 
+    # Scan live claims once for the whole render pass (cheap, single proc walk).
+    live_claims_map = _scan_live_claims()
+
+    # Soft-warn for active quests missing the core fields. Doesn't block rendering.
+    _missing = []
+    for _pid, _proj in data["projects"].items():
+        for _q in _proj.get("quests", []):
+            if _q.get("status") != "current":
+                continue
+            gaps = [k for k in ("desc", "kpi", "why", "next_step") if not _q.get(k)]
+            if gaps:
+                _missing.append(f"{_pid}/#{_q.get('n','?')} {_q.get('id','?')}: missing {', '.join(gaps)}")
+    if _missing:
+        print("  WARN: active quests with missing core fields:", file=sys.stderr)
+        for line in _missing[:20]:
+            print(f"    - {line}", file=sys.stderr)
+        if len(_missing) > 20:
+            print(f"    ({len(_missing) - 20} more)", file=sys.stderr)
+
     rendered = 0
+    md_written = 0
     for pid, project in data["projects"].items():
-        precompute(pid, project, themes)
+        precompute(pid, project, themes, live_claims_map=live_claims_map)
         proj_dir = SITE / pid
         proj_dir.mkdir(parents=True, exist_ok=True)
         for view, html_out in render_project(project, project.get("theme", "pokemon")).items():
             (proj_dir / f"{view}.html").write_text(html_out, encoding="utf-8")
+        # Per-quest .md briefing files for AI/curl access. Two paths each:
+        #   localhost:8770/<project>/quest-<id>.md  (prefixed, namespace-safe)
+        #   localhost:8770/<project>/<id>.md        (shorter, friendlier)
+        # Bare-name shadowing of theme files (plan-card, quest-log, route, index)
+        # is impossible because those are .html, not .md.
+        for q in project.get("quests", []):
+            qid = q.get("id")
+            md = q.get("briefing_md")
+            if qid and md:
+                (proj_dir / f"quest-{qid}.md").write_text(md, encoding="utf-8")
+                (proj_dir / f"{qid}.md").write_text(md, encoding="utf-8")
+                md_written += 1
         rendered += 1
         print(f"  rendered: {pid} ({project.get('theme')})")
 
     # Global index
     (SITE / "index.html").write_text(render_global_index(data), encoding="utf-8")
 
-    print(f"OK — {rendered} project(s) rendered to {SITE}")
+    print(f"OK — {rendered} project(s), {md_written} quest briefings rendered to {SITE}")
     return 0
 
 

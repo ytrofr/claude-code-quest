@@ -81,6 +81,9 @@
   .card.locked .row-locked { display: flex; }
   .qd-dep-blocked { padding: 6px 10px; margin-top: 6px; background: #f7eed8; border: 2px dashed #c0a878; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6a4828; }
   .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; }
+  .qd-live-claims { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 10px; background: rgba(91,180,216,0.10); border: 2px solid #5a8aa0; border-radius: 8px; }
+  .qd-live-claims-label { font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: #2a5a8a; text-transform: uppercase; padding-right: 4px; border-right: 1px dashed #5a8aa0; }
+  .qd-live-claim-pill { padding: 2px 8px; background: #fffdf2; border: 2px solid #5a8aa0; border-radius: 12px; font-weight: 600; font-size: 12px; color: #2a5a8a; }
 </style>
 </head>
 <body>
@@ -136,6 +139,12 @@
           <div class="prog-bar"><div class="prog-fill" style="width:{{q.progress_pct}}%"></div></div>
           <div class="prog-next">▶ {{q.next_step}}</div>
         </div>
+        {{#if q.has_live_claims}}
+        <div class="qd-live-claims" title="Sessions currently working on this quest">
+          <span class="qd-live-claims-label">live</span>
+          {{{q.live_claims_html}}}
+        </div>
+        {{/if}}
         <div class="done-row row-done">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5,12 10,17 19,7"/></svg>
           Trophy claimed · +{{q.xp_reward}} XP

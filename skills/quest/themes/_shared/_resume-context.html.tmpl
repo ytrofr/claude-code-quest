@@ -1,0 +1,10 @@
+<!-- Partial: _resume-context
+     Scope keys used: resume_context (string)
+     Renders a blue-bordered "Resume context" block. Skips when empty.
+     Written for a fresh AI/human reader picking up the quest cold. -->
+{{#if resume_context}}
+<section class="qd-resume" data-qd="resume">
+  <h3 class="qd-resume-title">Resume context</h3>
+  <p>{{resume_context}}</p>
+</section>
+{{/if}}

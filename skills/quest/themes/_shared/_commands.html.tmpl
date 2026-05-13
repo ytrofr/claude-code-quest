@@ -1,0 +1,16 @@
+<!-- Partial: _commands
+     Scope keys used: commands (list of {cmd, purpose})
+     Each row: command in dark code style on line 1, purpose dimmed on line 2. -->
+{{#if commands}}
+<section class="qd-commands" data-qd="commands">
+  <h3 class="qd-commands-title">Commands</h3>
+  <ul class="qd-commands-list">
+    {{#each commands}}
+    <li class="qd-commands-row">
+      <code class="qd-commands-cmd">{{q.cmd}}</code>
+      {{#if q.purpose}}<span class="qd-commands-purpose">{{q.purpose}}</span>{{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</section>
+{{/if}}

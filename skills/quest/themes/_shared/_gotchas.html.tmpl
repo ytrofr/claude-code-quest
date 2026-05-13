@@ -1,0 +1,14 @@
+<!-- Partial: _gotchas
+     Scope keys used: gotchas (list of strings)
+     "Don't repeat" warnings — things that were tried and failed.
+     Critical for AI sessions resuming a quest, prevents re-walking dead paths. -->
+{{#if gotchas}}
+<section class="qd-gotchas" data-qd="gotchas">
+  <h3 class="qd-gotchas-title">Gotchas — don't repeat</h3>
+  <ul class="qd-gotchas-list">
+    {{#each gotchas}}
+    <li class="qd-gotchas-row">{{q}}</li>
+    {{/each}}
+  </ul>
+</section>
+{{/if}}

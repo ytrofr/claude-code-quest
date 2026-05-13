@@ -1,0 +1,16 @@
+<!-- Partial: _files-touched
+     Scope keys used: files_touched (list of {path, role})
+     Each row: path on line 1 (mono), role on line 2 (dimmed). -->
+{{#if files_touched}}
+<section class="qd-files" data-qd="files">
+  <h3 class="qd-files-title">Files touched</h3>
+  <ul class="qd-files-list">
+    {{#each files_touched}}
+    <li class="qd-files-row">
+      <code class="qd-files-path">{{q.path}}</code>
+      {{#if q.role}}<span class="qd-files-role">{{q.role}}</span>{{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</section>
+{{/if}}

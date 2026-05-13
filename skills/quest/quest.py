@@ -198,8 +198,10 @@ def cmd_add(args) -> int:
         sys.exit(f"ERROR: quest id '{qid}' already exists in '{args.project_id}'")
     n = len(project["quests"]) + 1
     landmark = args.landmark or LANDMARKS[(n - 1) % len(LANDMARKS)]
-    has_current = any(q.get("status") == "current" for q in project["quests"])
-    status = "locked" if (args.locked or has_current) else "current"
+    # I1: "current" is plural — never auto-lock based on existing currents.
+    # New quests default to current; operator must pass --locked to gate them.
+    # Regression: ~/.claude/skills/quest/test_current_is_plural.py (8 tests)
+    status = "locked" if args.locked else "current"
     quest = {
         "id": qid,
         "n": n,
@@ -249,11 +251,9 @@ def cmd_update(args) -> int:
     if args.status is not None:
         if args.status not in ("done", "current", "locked"):
             sys.exit("ERROR: status must be done|current|locked")
-        # If setting current, demote any other current to locked
-        if args.status == "current":
-            for q in project["quests"]:
-                if q is not quest and q.get("status") == "current":
-                    q["status"] = "locked"
+        # I1: "current" is plural — promoting one quest MUST NOT demote others.
+        # Only operator-explicit `update <id> --status locked` can demote a quest.
+        # Regression: ~/.claude/skills/quest/test_current_is_plural.py (8 tests)
         quest["status"] = args.status
         changes.append(f"status={args.status}")
     if getattr(args, "clear_links", False):
@@ -546,12 +546,37 @@ def cmd_claim(args) -> int:
         return 2
     RUN.mkdir(parents=True, exist_ok=True)
 
-    # Resolve target — explicit args win, else auto-detect
+    # Resolve target — explicit args win, else auto-detect.
     project_id = getattr(args, "project_id", None)
     quest_id = getattr(args, "quest_id", None)
+    session_name_arg = (getattr(args, "session_name", None) or "").strip()
+    session_slug = _kebab(session_name_arg) if session_name_arg else ""
+
     if not project_id or not quest_id:
         ap, aq = auto_detect_quest()
         project_id = project_id or ap
+
+        # Name-based match: if --session-name is provided AND substring-matches
+        # an active quest id (either direction), prefer that over most-recent.
+        # Prevents the "two sessions in same cwd both auto-claim same quest" bug
+        # when the operator deliberately named the session for the work it does.
+        if project_id and session_slug and not quest_id:
+            try:
+                _data_peek = load()
+                project_peek = _data_peek.get("projects", {}).get(project_id) or {}
+                currents = [q for q in project_peek.get("quests", [])
+                            if q.get("status") == "current"]
+                matched = next(
+                    (q for q in currents
+                     if (session_slug in q.get("id", "")
+                         or q.get("id", "") in session_slug)),
+                    None,
+                )
+                if matched:
+                    quest_id = matched["id"]
+            except Exception:
+                pass  # fall through to default auto-detect
+
         quest_id = quest_id or aq
 
     if not project_id:
@@ -576,11 +601,22 @@ def cmd_claim(args) -> int:
 
     claim_file_for(key).write_text(f"{project_id}/{quest_id}\n", encoding="utf-8")
 
+    # Sidecar .name file — captures the chosen session name next to the claim.
+    # Survives independent of quests.json mutations and supports multiple live
+    # sessions on the same quest (each session has its own sidecar).
+    session_name = getattr(args, "session_name", None) or ""
+    session_name = session_name.strip()
+    name_sidecar = claim_file_for(key).with_suffix(".name")
+    if session_name:
+        name_sidecar.write_text(session_name + "\n", encoding="utf-8")
+    else:
+        # Clean stale sidecar if the new claim has no name
+        try: name_sidecar.unlink()
+        except FileNotFoundError: pass
+
     # Stamp session_name onto the quest so the dashboard title can render
     # "Quest Name (session-name)" when they differ. Last-claimer-wins.
     # session_name comes from --session-name flag (CC --name passed through).
-    session_name = getattr(args, "session_name", None) or ""
-    session_name = session_name.strip()
     if session_name:
         # Only store if it adds info — empty or kebab-equals-qid is noise.
         if _kebab(session_name) != quest_id:
@@ -634,6 +670,9 @@ def cmd_unclaim(args) -> int:
         pass
 
     cf.unlink()
+    # Clean sidecar name file if present
+    try: cf.with_suffix(".name").unlink()
+    except FileNotFoundError: pass
     print(f"Unclaimed (was: {cf.name})")
     return 0
 

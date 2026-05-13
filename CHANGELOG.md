@@ -2,6 +2,36 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-05-13
+
+AI-resume briefings, link buckets, normalized type scale, live-claim pills.
+
+### Added
+
+- **Five new optional quest fields** for handoff to a fresh AI/human reader:
+  - `resume_context` — paragraph addressed to whoever picks the quest up cold.
+  - `files_touched` — list of `{path, role}` describing the relevant files.
+  - `commands` — list of `{cmd, purpose}` for tests, deploys, etc.
+  - `gotchas` — list of "don't repeat — already failed" strings.
+  - `repo` — absolute path to the working dir.
+- **"Copy briefing" button** on the plan card. Copies a self-contained markdown briefing (project, status, brief, why, outcome, done/todo actions, resume context, skills, files, commands, gotchas, links) to the clipboard. Paste into a fresh AI session to resume work.
+- **Per-quest `.md` endpoint**: each quest is rendered to a static markdown file at `/<project>/quest-<id>.md` and `/<project>/<id>.md` so an AI can `WebFetch` the briefing directly.
+- **Auto-bucketed links** in the Links section. URL pattern routes links into 6 collapsible groups: Try it · Code & commits · Learning entries · Project rules · Skills · Plan. Empty buckets hide automatically.
+- **Live-claim pills** on the quest-log page. For every active quest, shows a small "live: `<name>`" row listing the chosen names of CC sessions currently claiming the quest. Hidden when no sessions are working on it.
+- **Sidecar `.name` file** written next to each `.quest` claim by `/quest claim --session-name`. Survives independent of quest JSON mutations and supports multiple live sessions on the same quest (each session has its own sidecar).
+- **Name-based auto-claim**: `/quest claim --session-name <slug>` now substring-matches the slug against active quest ids before falling back to most-recently-touched. Launch `claude --name moshytz` and the quest containing "moshytz" gets claimed.
+- **Render-time soft warn** lists active quests missing core fields (desc / kpi / why / next_step) to stderr. No block, just visibility.
+
+### Changed
+
+- **Type scale normalized** to 6 tiers (`xl 36 / lg 22 / md 18 / base 15 / sm 13 / xs 12`). Previous CSS declared 13 different font sizes across templates with conflicting cascade; an override block at end of `<style>` collapses everyone to the tier scale.
+- **Symbols dropped from headings** (`▸ ⚔ ✏` and em-dash chrome around section labels). Status pill renders title-case (`Active` not `ACTIVE`). Tags display with ` · ` separator and hyphens-to-spaces.
+
+### Fixed
+
+- **"TODO TODO TODO" empty preview rows** when a quest uses legacy `tasks[]` with `label` instead of `title`. The tasks→actions synthesizer now accepts both field names.
+- **Double-prefixed plan path** (`Plan file: ~/.claude/plans//home/<user>/.claude/plans/<file>.md`) when a quest's `plan` field was stored as an absolute path. `render.py` now normalizes plan paths to filename only.
+
 ## [1.6.2] — 2026-05-10
 
 Plan-card render bug fixes surfaced by real quest data.

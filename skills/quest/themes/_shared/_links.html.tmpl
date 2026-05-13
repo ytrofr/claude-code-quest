@@ -1,20 +1,24 @@
 <!-- Partial: _links
-     Scope keys used: links (list of {url, label, desc})
-     `links` is hoisted from active.links by render.py.
-     Renders a Links section on the plan card with one row per entry:
-     clickable label + optional one-line description + dimmed URL.
-     Skips render entirely when links is empty/missing. -->
-{{#if links}}
+     Scope keys used: link_buckets (list of {name, count, links_html})
+     `link_buckets` is built by render.py from active.links — groups by URL pattern
+     into Try it / Code & commits / Learning entries / Project rules / Skills / Plan.
+     Each bucket is a collapsible <details>; empty buckets are dropped server-side.
+     `links_html` is pre-rendered raw HTML (template engine doesn't support nested
+     {{#each}}, so the inner <li> rows are baked in Python). -->
+{{#if link_buckets}}
 <section class="qd-links" data-qd="links">
   <h3 class="qd-links-title">Links</h3>
   <ul class="qd-links-list">
-    {{#each links}}
-    <li class="qd-link">
-      <a class="qd-link-anchor" href="{{q.url}}" target="_blank" rel="noopener">
-        <span class="qd-link-label">{{q.label}}</span>
-        {{#if q.desc}}<span class="qd-link-desc">{{q.desc}}</span>{{/if}}
-        <span class="qd-link-url">{{q.url}}</span>
-      </a>
+    {{#each link_buckets}}
+    <li class="qd-link-bucket">
+      <details>
+        <summary class="qd-link-bucket-summary">
+          <span class="qd-link-bucket-arrow" aria-hidden="true">▸</span>
+          <span class="qd-link-bucket-name">{{q.name}}</span>
+          <span class="qd-link-bucket-count">{{q.count}}</span>
+        </summary>
+        <ul class="qd-link-bucket-list">{{{q.links_html}}}</ul>
+      </details>
     </li>
     {{/each}}
   </ul>
