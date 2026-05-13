@@ -75,6 +75,9 @@
   .filt-action:hover { background: #f3e6c4; }
   .qd-dep-blocked { padding: 5px 10px; margin-top: 6px; background: #ede0c0; border: 1px dashed #8a6f4a; border-radius: 4px; font-family: 'Eczar', serif; font-style: italic; font-size: 13px; color: #6a4a30; }
   .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; font-style: normal; }
+  .qd-live-claims { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 10px; background: rgba(91,180,216,0.10); border: 1px solid #5a8aa0; border-radius: 4px; }
+  .qd-live-claims-label { font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: #2a5a8a; text-transform: uppercase; padding-right: 4px; border-right: 1px dashed #5a8aa0; }
+  .qd-live-claim-pill { padding: 2px 8px; background: #fffdf2; border: 1px solid #5a8aa0; border-radius: 12px; font-weight: 600; font-size: 12px; color: #2a5a8a; }
 </style>
 </head>
 <body>
@@ -138,6 +141,12 @@
           </div>
           {{#if q.depends_on_str}}
           <div class="qd-dep-blocked">After: {{q.depends_on_str}}</div>
+          {{/if}}
+          {{#if q.has_live_claims}}
+          <div class="qd-live-claims" title="Sessions currently working on this quest">
+            <span class="qd-live-claims-label">live</span>
+            {{{q.live_claims_html}}}
+          </div>
           {{/if}}
         </div>
         <div class="right-tag">+{{q.xp_reward}}</div>

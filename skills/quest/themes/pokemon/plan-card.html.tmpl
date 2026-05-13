@@ -72,6 +72,92 @@
   .qd-deeds-toggle.on { background: #2a3a4a; color: #ffd24a; border-color: #2a3a4a; }
   .qd-toggle-mark { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 3px; text-align: center; font-weight: 800; line-height: 10px; font-size: 11px; }
   .qd-deeds-toggle.on .qd-toggle-mark::before { content: '✓'; }
+
+  /* Type scale normalization (2026-05-13) — collapses 13 sizes to 6 tiers.
+     Tiers: xl 36 · lg 22 · md 18 · base 15 · sm 13 · xs 12. Remove block to revert. */
+  .quest-title { font-size: 36px; }
+  h1, .badge { font-size: 22px; }
+  .desc p,
+  .next-step p,
+  .qd-action-head,
+  .qd-task-title,
+  .qd-next-text,
+  .qd-link-label,
+  .stat-line { font-size: 18px; }
+  .sub,
+  .quest-no,
+  .crumbs,
+  .nav a,
+  .qd-back-link,
+  .pill,
+  .qd-pill,
+  .btn,
+  .desc-h + p,
+  .qd-tasks-count,
+  .qd-actions-count,
+  .qd-deeds-toggle,
+  .qd-actions-hide-done,
+  .qd-action-body,
+  .qd-action-body p,
+  .qd-link-desc,
+  .qd-actions-empty-hint,
+  .qd-tasks-summary-preview,
+  .meta-line,
+  .qd-meta dt,
+  .qd-meta dd { font-size: 15px; }
+  .stats-h,
+  .desc-h,
+  .next-step h3,
+  .qd-tasks-title,
+  .qd-links-title,
+  .qd-actions-title,
+  .qd-active-picker-label,
+  .qd-active-picker a,
+  .qd-why { font-size: 13px; }
+  .qd-link-url,
+  .qd-action-status,
+  .qd-meta code,
+  .qd-plan-chip,
+  code { font-size: 12px; }
+  /* end type-scale block */
+
+  /* Link buckets — collapsible groups in Links section. */
+  .qd-link-bucket { padding: 0; list-style: none; }
+  .qd-link-bucket details { background: #f7eed8; border: 2px solid #2a3a4a; border-radius: 8px; padding: 8px 12px; }
+  .qd-link-bucket details[open] { background: #fffdf2; }
+  .qd-link-bucket-summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; padding: 2px 0; font-weight: 700; font-size: 15px; color: #5a1818; }
+  .qd-link-bucket-summary::-webkit-details-marker { display: none; }
+  .qd-link-bucket-arrow { color: #ff6a3a; font-size: 14px; transition: transform 0.15s ease; opacity: 0.85; flex-shrink: 0; }
+  .qd-link-bucket details[open] > .qd-link-bucket-summary > .qd-link-bucket-arrow { transform: rotate(90deg); opacity: 1; }
+  .qd-link-bucket-name { flex: 1; }
+  .qd-link-bucket-count { font-weight: 600; font-size: 12px; color: #6a7a8a; padding: 2px 8px; background: #fffdf2; border: 1.5px solid #c0a878; border-radius: 10px; }
+  .qd-link-bucket-list { list-style: none; padding: 10px 0 2px; margin: 0; display: grid; gap: 6px; }
+  .qd-link-bucket-list .qd-link-anchor { grid-template-columns: minmax(0, 1fr); padding: 8px 10px; }
+  .qd-link-bucket-list .qd-link-label { grid-column: 1; grid-row: 1; }
+  .qd-link-bucket-list .qd-link-desc { grid-column: 1; grid-row: 2; }
+
+  /* Status pill — keep title-case ("Active" not "ACTIVE") */
+  .pill.type { text-transform: none; letter-spacing: 0.3px; }
+
+  /* AI-resume sections (2026-05-13) */
+  .qd-resume { margin-top: 14px; padding: 14px 16px; background: rgba(91,180,216,0.08); border: 3px solid #5a8aa0; border-radius: 12px; }
+  .qd-resume-title { margin: 0 0 6px; font-weight: 700; font-size: 13px; letter-spacing: 2.5px; color: #2a5a8a; text-transform: uppercase; }
+  .qd-resume p { margin: 0; font-size: 15px; line-height: 1.55; color: #2a3a4a; }
+  .qd-files, .qd-commands { margin-top: 14px; padding: 14px 16px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 12px; }
+  .qd-files-title, .qd-commands-title { margin: 0 0 10px; font-weight: 700; font-size: 13px; letter-spacing: 2.5px; color: #6a7a8a; text-transform: uppercase; }
+  .qd-files-list, .qd-commands-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .qd-files-row, .qd-commands-row { display: block; }
+  .qd-files-path, .qd-commands-cmd { display: inline-block; font-family: ui-monospace, monospace; padding: 3px 8px; border-radius: 5px; font-size: 13px; }
+  .qd-files-path { background: #f7eed8; color: #5a1818; }
+  .qd-commands-cmd { background: #1a2530; color: #ffd24a; }
+  .qd-files-role, .qd-commands-purpose { display: block; color: #6a7a8a; font-size: 13px; margin-top: 3px; padding-left: 4px; }
+  .qd-gotchas { margin-top: 14px; padding: 14px 16px; background: rgba(196,74,42,0.06); border: 3px solid #c44a2a; border-radius: 12px; }
+  .qd-gotchas-title { margin: 0 0 8px; font-weight: 700; font-size: 13px; letter-spacing: 2.5px; color: #c44a2a; text-transform: uppercase; }
+  .qd-gotchas-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .qd-gotchas-row { padding: 8px 12px; background: #fffdf2; border-left: 3px solid #c44a2a; border-radius: 4px; font-size: 14px; line-height: 1.5; color: #5a1818; }
+  .qd-copy-briefing { transition: transform 0.08s ease; }
+  .qd-copy-briefing:active { transform: translateY(1px); }
+
   body.hide-done-deeds .qd-task.qd-task-done { display: none; }
   /* Storyline link styles + plan-file chips (used in qd-meta) */
   .qd-storyline-link { color: #c44a2a; font-weight: 700; text-decoration: none; border-bottom: 1px dashed #c44a2a; }
@@ -329,6 +415,39 @@
     else if (stored === 'closed') det.open = false;
     det.addEventListener('toggle', function() {
       try { localStorage.setItem(k, det.open ? 'open' : 'closed'); } catch (e) {}
+    });
+  });
+})();
+
+/* Copy briefing button — reads the hidden <pre.qd-briefing-raw> inside the
+   same quest article and copies its text to the clipboard. */
+(function() {
+  document.querySelectorAll('[data-qd="copy-briefing"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var article = btn.closest('article.qd-quest-block') || document;
+      var pre = article.querySelector('.qd-briefing-raw');
+      if (!pre) return;
+      var text = pre.textContent || '';
+      var label = btn.querySelector('.qd-copy-label');
+      var done = function() {
+        if (label) {
+          var orig = label.textContent;
+          label.textContent = 'Copied!';
+          setTimeout(function() { label.textContent = orig; }, 1500);
+        }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function() {
+          // Fallback: select text in a temp textarea
+          var ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); done(); }
+          catch (e) { alert('Copy unavailable. Text:\n\n' + text); }
+          document.body.removeChild(ta);
+        });
+      } else {
+        alert('Copy unavailable. Text:\n\n' + text);
+      }
     });
   });
 })();
