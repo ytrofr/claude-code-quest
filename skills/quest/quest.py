@@ -20,6 +20,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import sidecar
+
 ROOT = Path.home() / ".claude"
 DATA = ROOT / "quest" / "data" / "quests.json"
 THEMES = ROOT / "skills" / "quest" / "themes"
@@ -35,7 +37,7 @@ DASHBOARD_URL = "http://localhost:8770"
 # a process whose comm == "claude". Its (pid, raw starttime ticks) form a
 # stable, deterministic key for the lifetime of that CC instance.
 #
-# Why not bus identity? The inter-agent registry has stale entries for sessions
+# Why not an external session registry? It can carry stale entries for sessions
 # whose SessionStart hook didn't register (or whose claude_pid rolled). Walking
 # /proc directly is more robust + dependency-free.
 def _walk_to_claude() -> tuple[int, str] | None:
@@ -475,6 +477,80 @@ def cmd_chapters(args) -> int:
     return 0
 
 
+def cmd_todo(args) -> int:
+    """Manage a quest's personal My To-Do sidecar file.
+
+    Actions: add | done | undone | rm | note | list | edit. The sidecar lives
+    at ~/.claude/quest/data/notes/<proj>__<quest>.md — user-owned, written
+    directly or via these commands, and never touched by autosync.
+    """
+    data = load()
+    project = get_project(data, args.project_id)       # validates project
+    quest = find_quest(project, args.quest_id)         # validates quest (sys.exit on miss)
+    path = sidecar.sidecar_path(args.project_id, args.quest_id)
+    action = args.action
+    rest = args.rest
+
+    if action == "edit":
+        print(path)
+        return 0
+
+    if action == "list":
+        print(f"# {path}")
+        if path.exists():
+            print(path.read_text(encoding="utf-8").rstrip("\n"))
+        else:
+            print('(no sidecar yet — add one with: quest.py todo add <proj> <quest> "...")')
+        return 0
+
+    # Interpret the trailing args per action.
+    if action in ("add", "note"):
+        text_arg = " ".join(rest).strip()
+        if not text_arg:
+            sys.exit(
+                f'ERROR: "todo {action}" needs text — '
+                f'quest.py todo {action} <proj> <quest> "..."'
+            )
+    else:  # done | undone | rm
+        if not rest:
+            sys.exit(
+                f'ERROR: "todo {action}" needs an index N — '
+                f"quest.py todo {action} <proj> <quest> <N>"
+            )
+        try:
+            n_arg = int(rest[0])
+        except ValueError:
+            sys.exit(f'ERROR: "todo {action}" index must be an integer (got {rest[0]!r})')
+        if n_arg < 1:
+            sys.exit("ERROR: todo index must be >= 1")
+
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    if action == "add":
+        text = sidecar.ensure_header(text, quest["name"])
+        text = sidecar.append_todo(text, text_arg)
+    elif action == "note":
+        text = sidecar.ensure_header(text, quest["name"])
+        text = sidecar.append_note(text, text_arg)
+    elif action in ("done", "undone"):
+        try:
+            text = sidecar.set_todo_done(text, n_arg, action == "done")
+        except IndexError as e:
+            sys.exit(f"ERROR: {e}")
+    elif action == "rm":
+        try:
+            text = sidecar.remove_todo(text, n_arg)
+        except IndexError as e:
+            sys.exit(f"ERROR: {e}")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text, encoding="utf-8")
+    print(f"todo {action}: {args.project_id}/{args.quest_id} → {path}")
+    return render_now()
+
+
 # ---- claim/unclaim (session ↔ quest binding for statusline) ----
 
 def _path_map() -> list[tuple[str, str]]:
@@ -504,8 +580,8 @@ def auto_detect_quest(cwd: str | None = None) -> tuple[str | None, str | None]:
     pid = None
     # Match prefix when cwd is exactly the prefix OR starts with `prefix`
     # followed by a separator (`/`, `-`, `_`). Lets one entry like
-    # `~/LimorAI` cover all worktrees `LimorAI-Limor`, `LimorAI-staging`,
-    # while rejecting `LimorAI2` / `LimorAIxyz`.
+    # `~/my-project` cover all worktrees `my-project-feature`, `my-project-staging`,
+    # while rejecting `my-project2` / `my-projectxyz`.
     for prefix, candidate in _path_map():
         prefix = prefix.rstrip("/")
         if cwd == prefix or any(cwd.startswith(prefix + sep) for sep in ("/", "-", "_")):
@@ -789,6 +865,20 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("chapters", help="List archived chapters")
     s.add_argument("project_id", nargs="?", help="Optional — defaults to all projects")
     s.set_defaults(func=cmd_chapters)
+
+    s = sub.add_parser(
+        "todo",
+        help="Manage a quest's personal My To-Do sidecar (add/done/undone/rm/note/list/edit)",
+    )
+    s.add_argument("action", choices=["add", "done", "undone", "rm", "note", "list", "edit"])
+    s.add_argument("project_id")
+    s.add_argument("quest_id")
+    s.add_argument(
+        "rest",
+        nargs="*",
+        help='text for add|note, or index N for done|undone|rm (nothing for list|edit)',
+    )
+    s.set_defaults(func=cmd_todo)
 
     s = sub.add_parser("claim", help="Bind THIS session to a quest (statusline link)")
     s.add_argument("project_id", nargs="?", help="Project id (auto-detected from cwd if omitted)")

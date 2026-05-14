@@ -41,10 +41,10 @@ It's not trying to compete with team-issue trackers. It's the personal layer abo
 
 | Component | What |
 |---|---|
-| `/quest` skill | `status`, `init`, `add`, `update`, `done`, `theme`, `style`, `render`, `reset`, `chapters` subcommands |
+| `/quest` skill | `status`, `init`, `add`, `update`, `done`, `theme`, `style`, `render`, `reset`, `chapters`, `todo` subcommands |
 | Hand-rolled renderer | Zero-dep Python (~430 LOC). `{{var}}`, `{{#each}}`, `{{#if}}`, `{{> partial}}` |
 | Two ready themes | Pokémon (cartoon, Fredoka) + Storybook (parchment, Eczar) — 3 views × 7 landmark SVGs each |
-| Shared partials | `_back-link`, `_taskslist`, `_meta-row`, `_progress-bar`, `_pills`, `_why`, `_next-step` |
+| Shared partials | `_back-link`, `_taskslist`, `_my-todo`, `_meta-row`, `_progress-bar`, `_pills`, `_why`, `_next-step` |
 | Trainer Hall home index | Pokémon-themed card grid at `/` — one card per project with level pill, gold XP bar, 3 stat pills, "Currently Battling" callout, and Begin Adventure + Pokédex buttons. Per-project `accent` (hex) + `icon` (landmark) overrides via `/quest style`. |
 | Click-to-expand briefs | Each task and the next-step expand to show "Problem → Solution" sentences |
 | Multi-select status filter | Active / Visited / Sealed pills toggle independently on quest-log, persisted per-project in `localStorage`. Plus "Show All" / "Active Only" quick-actions. |
@@ -52,6 +52,8 @@ It's not trying to compete with team-issue trackers. It's the personal layer abo
 | Storyline rendering | Plan-card meta box shows **Sequel to** ◀ (predecessors from `depends_on`), **Leads to** ▶ (auto-computed successors), and **Plans** (originating plan + sub-plans). Quest names are clickable links. |
 | Auto-progress hook | PostToolUse async, parses `## Section 13` checkboxes into `tasks[]` + `progress` — **zero LLM calls** |
 | Plan sub-bullet parser | `- [x] Title` followed by `- Problem: …` / `- Solution: …` becomes click-expandable detail |
+| My To-Do (per-quest) | A user-owned markdown sidecar (`quest/data/notes/<proj>__<quest>.md`) for your own todos + notes — write `- [ ]` lines directly or use `/quest todo add\|done\|rm\|note`. Renders as a "My To-Do" section on the plan-card; **never touched by autosync**. |
+| Fenced diagram blocks | Triple-backtick blocks in §13/§14 action bodies render as aligned monospace `<pre>` panels — ASCII diagrams stay readable. |
 | systemd unit | localhost:8770, hardened (`ProtectSystem=strict`), auto-starts on boot |
 
 ## Install
@@ -190,6 +192,8 @@ Once installed, an auto-loaded rule teaches Claude to recognize:
 
 **How do I add a new project?** Run `/quest init <id>`, edit `~/.claude/quest/config.json` to add the path mapping, optionally drop a `quest-link.md` pointer in the project's `.claude/` dir. See `docs/adding-projects.md`.
 
+**Can I jot my own tasks on a quest?** Yes — every quest has a **My To-Do** section backed by a plain markdown sidecar file you own (`quest/data/notes/<proj>__<quest>.md`). Write `- [ ]` lines straight into the file, or use `/quest todo add|done|undone|rm|note|list|edit`. The autosync hook never plan-parses it — it's your space, and it survives every autosync rewrite.
+
 **Can the parser handle nested plans / Hebrew / non-English content?** Yes. UTF-8 throughout. The parser only looks for the `- [x]`/`- [ ]` checkbox pattern in `## Section 13`; it doesn't care what's between the brackets.
 
 ## Architecture choices (and what we said NO to)
@@ -213,7 +217,7 @@ claude-code-quest/
 ├── LICENSE             ← MIT
 ├── CITATION.cff        ← academic citation metadata
 ├── install.sh          ← one-shot installer
-├── skills/quest/       ← the skill (SKILL.md + 3 .py + themes/)
+├── skills/quest/       ← the skill (SKILL.md + 4 .py + test suite + themes/)
 ├── hooks/              ← quest-plan-autosync.sh
 ├── systemd/            ← quest-dashboard.service template
 ├── examples/           ← sample quests.json + config.json

@@ -1,0 +1,52 @@
+<!-- Partial: _my-todo — user-authored "My To-Do" section.
+     Scope keys (from sidecar.my_todo_scope, hoisted per-quest by render.py):
+       my_todo_has   (bool)  — there is at least one todo OR notes
+       my_todo_empty (bool)  — inverse of my_todo_has (engine has no {{#unless}})
+       my_todo       (list)  — [{title, done, done_class, done_mark}]
+       my_todo_done / my_todo_total (int) — counts
+       my_todo_next  (str)   — first not-done title (preview)
+       my_notes_html (str)   — rendered notes HTML (raw-injected)
+
+     The section ALWAYS renders — content when my_todo_has, an empty-state hint
+     otherwise. Open by default (it is the user's own space), but still a
+     <details> so the collapse state persists per quest via the plan-card JS.
+     Source of truth: ~/.claude/quest/data/notes/<proj>__<quest>.md — written
+     directly or via `/quest todo`, never touched by autosync. -->
+{{#if my_todo_has}}
+<section class="qd-my-todo qd-tasks" data-qd="my-todo">
+  <details data-qd-collapse="my-todo" open>
+    <summary class="qd-tasks-summary">
+      <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
+      <h3 class="qd-tasks-title">My To-Do</h3>
+      <span class="qd-tasks-count">{{my_todo_done}} / {{my_todo_total}}</span>
+      {{#if my_todo_next}}<span class="qd-tasks-summary-preview">Next: {{my_todo_next}}</span>{{/if}}
+    </summary>
+    {{#if my_todo_total}}
+    <ul class="qd-tasks-list">
+      {{#each my_todo}}
+      <li class="qd-task qd-task-{{q.done_class}}">
+        <span class="qd-task-mark" aria-hidden="true">{{q.done_mark}}</span>
+        <span class="qd-task-title">{{q.title}}</span>
+      </li>
+      {{/each}}
+    </ul>
+    {{/if}}
+    {{#if my_notes_html}}
+    <div class="qd-my-notes">
+      <h4 class="qd-my-notes-title">Notes</h4>
+      {{{my_notes_html}}}
+    </div>
+    {{/if}}
+  </details>
+</section>
+{{/if}}
+{{#if my_todo_empty}}
+<section class="qd-my-todo qd-my-todo-empty" data-qd="my-todo-empty">
+  <div class="qd-tasks-summary">
+    <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
+    <h3 class="qd-tasks-title">My To-Do</h3>
+    <span class="qd-actions-empty-badge">none yet</span>
+  </div>
+  <p class="qd-actions-empty-hint">Your space — jot tasks &amp; notes for this quest. Add one with <code>/quest todo add &lt;proj&gt; &lt;quest&gt; "..."</code>, or open the file with <code>/quest todo edit &lt;proj&gt; &lt;quest&gt;</code>.</p>
+</section>
+{{/if}}

@@ -72,8 +72,8 @@ quest_indicator() {
   # Tier 2: auto-detect from cwd (only if no explicit claim).
   # Match a path_map prefix when cwd is exactly the prefix OR starts with
   # `prefix` followed by a separator (`/`, `-`, `_`). Lets one entry like
-  # `~/MyApp` match all sibling worktrees (`MyApp-feature`, `MyApp-staging`,
-  # `MyApp/sub/dir`) while still rejecting `MyApp2` / `MyAppXYZ`.
+  # `/home/me/my-project` match all sibling worktrees `my-project-feature`,
+  # `my-project-staging`, etc., while still rejecting `my-project2` / `my-projectxyz`.
   if [ -z "$project" ] && [ -r "$config" ]; then
     project=$(jq -r --arg cwd "$cwd" '
       .path_map // [] | map(select(.path as $p |

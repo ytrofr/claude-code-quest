@@ -92,7 +92,7 @@
 
       {{> _taskslist}}
 
-      {{> _user-tasks}}
+      {{> _my-todo}}
 
       {{> _next-step}}
 
@@ -109,8 +109,14 @@
       {{> _meta-row}}
 
       <!-- Hidden briefing payload — read by the Copy briefing button below.
-           {{{ }}} = raw output, no HTML escaping (markdown stays literal). -->
-      <pre class="qd-briefing-raw" hidden>{{{briefing_md}}}</pre>
+           MUST be {{ }} (HTML-escaped), NEVER {{{ }}} (raw). briefing_md is
+           quest TEXT and routinely contains literal <style>/<script>/<pre>
+           (quests describing code). Raw-injected, the parser treats those as
+           real raw-text elements and swallows every block after this one +
+           the page <script> — collapsing the whole plan-card. The Copy
+           briefing button reads .textContent, which decodes entities back,
+           so escaping is invisible to the user. Fixed 2026-05-14. -->
+      <pre class="qd-briefing-raw" hidden>{{briefing_md}}</pre>
 
       <div class="actions">
         <a class="btn primary" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> Resume Quest</a>
