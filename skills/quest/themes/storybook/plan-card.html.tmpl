@@ -146,9 +146,17 @@
   .qd-tasks-summary-arrow { color: #c44a2a; font-size: 14px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
   details[open] > .qd-tasks-summary > .qd-tasks-summary-arrow { transform: rotate(90deg); opacity: 1; }
   .qd-tasks-summary-preview { font-family: 'Eczar', serif; font-style: italic; font-size: 14px; color: #7a5a3a; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qd-user-tasks { margin-top: 22px; padding: 18px 22px; background: rgba(58,138,160,0.06); border: 2px solid #3a8aa0; }
-  .qd-user-tasks .qd-tasks-title { color: #3a8aa0; }
-  .qd-user-tasks .qd-tasks-count { color: #3a8aa0; }
+  /* My To-Do — the user's own section. Mossy-green accent in the storybook palette. */
+  .qd-my-todo { margin-top: 22px; padding: 18px 22px; background: rgba(46,122,68,0.07); border: 2px solid #3a7a4a; }
+  .qd-my-todo .qd-tasks-title { color: #2f6a3f; }
+  .qd-my-todo .qd-tasks-count { color: #3a7a4a; }
+  .qd-my-todo .qd-tasks-summary-arrow { color: #3a7a4a; }
+  .qd-my-todo .qd-task-done .qd-task-mark { background: #3a7a4a; color: #fbf3df; }
+  .qd-my-todo.qd-my-todo-empty { border-style: dashed; opacity: 0.9; }
+  .qd-my-notes { margin-top: 14px; padding: 12px 14px; background: #fbf3df; border: 1.5px solid #c89030; }
+  .qd-my-notes-title { margin: 0 0 6px; font-family: 'Eczar', serif; font-weight: 700; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #7a5a3a; }
+  .qd-my-notes p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; color: #4a2e1a; }
+  .qd-my-notes p:last-child { margin-bottom: 0; }
   /* Rich actions sections — Your Actions / Claude's Actions. Storybook palette. */
   .qd-actions { margin-top: 26px; padding: 18px 22px; border: 1.5px solid #4a2e1a; background: #fbf3df; }
   .qd-actions-claude { border-color: #7a5a3a; background: rgba(200,176,154,0.18); }
@@ -171,6 +179,7 @@
   .qd-action-body p { margin: 0 0 6px; }
   .qd-action-body p:last-child { margin-bottom: 0; }
   .qd-action-body code { font-family: ui-monospace, monospace; background: #f3e6c4; padding: 1px 6px; border: 1px solid #c89030; font-size: 13px; font-style: normal; }
+  .qd-action-body pre.qd-diagram { font-family: ui-monospace, monospace; white-space: pre; overflow-x: auto; background: #2a1f15; color: #f3e6c4; padding: 14px 16px; border: 2px solid #c89030; font-size: 12px; line-height: 1.35; margin: 8px 0; font-style: normal; box-shadow: inset 0 1px 4px rgba(0,0,0,.4); }
   .qd-action-body a { color: #c44a2a; font-weight: 700; text-decoration: none; border-bottom: 1px dashed #c44a2a; }
   .qd-action-body a:hover { background: #f3e6c4; border-bottom-style: solid; }
   .qd-action-status { display: inline-block; margin-left: 8px; padding: 1px 9px; font-family: 'Eczar', serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; vertical-align: middle; }

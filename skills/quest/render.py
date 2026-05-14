@@ -23,6 +23,8 @@ import re
 import sys
 from pathlib import Path
 
+import sidecar as _sidecar  # aliased — _scan_live_claims has a local var named `sidecar`
+
 ROOT = Path.home() / ".claude"
 DATA = ROOT / "quest" / "data" / "quests.json"
 SITE = ROOT / "quest" / "site"
@@ -99,6 +101,9 @@ HOISTED_QUEST_FIELDS = (
     "resume_context", "files_touched", "commands", "gotchas", "repo",
     "briefing_md",  # built server-side; raw-injected into hidden <pre>
     "live_claims", "live_claims_html", "has_live_claims",  # render-time scan
+    # My To-Do sidecar — user-authored todos + notes (quest/data/notes/<proj>__<qid>.md)
+    "my_todo", "my_todo_done", "my_todo_total", "my_todo_next",
+    "my_notes", "my_notes_html", "my_todo_has", "my_todo_empty",
 )
 
 
@@ -314,6 +319,24 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
             out.append(q["next_step"])
             out.append("")
 
+        # My To-Do — user-authored sidecar todos + notes (open first, then done).
+        my_todo = q.get("my_todo") or []
+        if my_todo:
+            done = [t for t in my_todo if t.get("done")]
+            todo = [t for t in my_todo if not t.get("done")]
+            out.append(f"## My To-Do ({len(done)} of {len(my_todo)} done)")
+            out.append("")
+            for t in todo:
+                out.append(f"- [ ] {t.get('title', '')}")
+            for t in done:
+                out.append(f"- [x] {t.get('title', '')}")
+            out.append("")
+        if q.get("my_notes"):
+            out.append("## My Notes")
+            out.append("")
+            out.append(q["my_notes"])
+            out.append("")
+
         if q.get("resume_context"):
             out.append("## Resume context")
             out.append("")
@@ -445,7 +468,7 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
                 title = next_task.get("title", "")
                 q["tasks_next"] = title[:80] + ("…" if len(title) > 80 else "")
         # Rich action items (new format — `### N. Title [STATUS]` from §13/§14).
-        # Two parallel arrays: actions (Claude's actions) + actions_user (Yatir's).
+        # Two parallel arrays: actions (Claude's actions) + actions_user (the user's).
         # Each item has {n, title, status, status_class, body_html}.
         # SYNTHESIS: legacy quests with tasks[] but no actions[] get auto-converted
         # so the rich UI shows for ALL quests. Synthesised actions have:
@@ -635,6 +658,19 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
                         f'<span class="qd-live-claim-pill">{html.escape(name)}</span>'
                     )
                 q["live_claims_html"] = "".join(pills)
+
+        # My To-Do sidecar — user-authored todos + notes from
+        # quest/data/notes/<proj>__<qid>.md. autosync never touches this file;
+        # the section renders on every quest's plan-card (empty-state when no
+        # content). Loaded BEFORE the briefing so _build_briefing_md sees it.
+        try:
+            _sc_path = _sidecar.sidecar_path(project_id, q.get("id", ""))
+            _sc_text = _sc_path.read_text(encoding="utf-8") if _sc_path.exists() else ""
+        except OSError:
+            _sc_text = ""
+        _sc_scope = _sidecar.my_todo_scope(_sidecar.parse_sidecar(_sc_text))
+        q.update(_sc_scope)
+        q["my_todo_empty"] = not _sc_scope["my_todo_has"]
 
         # Build briefing markdown for the Copy-briefing button + .md endpoint.
         # Must run AFTER all normalizations above so it captures the final shape.
@@ -1022,20 +1058,14 @@ def render_project(project: dict, theme: str) -> dict:
 # `accent` / `icon` fields on a project in quests.json. Fallback when a project
 # isn't in this map: rotate through ACCENT_PALETTE / ICON_ROTATION by index.
 DEFAULT_ACCENTS: dict[str, str] = {
-    "limor":    "#ff6a3a",
-    "smith":    "#3aaa6a",
-    "ogas":     "#9a6ace",
-    "gamify":   "#e8b430",
-    "logivote": "#3a8aa0",
-    "remotion": "#c44a2a",
+    "apollo": "#ff6a3a",
+    "atlas":  "#3aaa6a",
+    "nova":   "#9a6ace",
 }
 DEFAULT_ICONS: dict[str, str] = {
-    "limor":    "house",
-    "smith":    "camp",
-    "ogas":     "castle",
-    "gamify":   "camp",
-    "logivote": "cave",
-    "remotion": "tower",
+    "apollo": "house",
+    "atlas":  "tower",
+    "nova":   "castle",
 }
 ACCENT_PALETTE: list[str] = ["#ff6a3a", "#3aaa6a", "#9a6ace", "#e8b430", "#3a8aa0", "#c44a2a", "#5db4d8", "#ffd24a"]
 ICON_ROTATION: list[str] = ["house", "camp", "castle", "cave", "tower", "bridge", "mill"]

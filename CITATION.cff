@@ -5,7 +5,6 @@ type: software
 authors:
   - given-names: Yatir
     family-names: Ofer
-    email: yatirofer@gmail.com
 repository-code: "https://github.com/ytrofr/claude-code-quest"
 url: "https://github.com/ytrofr/claude-code-quest"
 abstract: >-
@@ -25,7 +24,8 @@ keywords:
   - productivity
   - multi-project
   - kanban-alternative
+  - todo-list
   - self-hosted
 license: MIT
-version: "1.6.1"
-date-released: "2026-05-09"
+version: "1.8.0"
+date-released: "2026-05-14"

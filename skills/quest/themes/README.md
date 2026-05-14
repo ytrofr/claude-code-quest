@@ -104,10 +104,10 @@ Keep the visual extent within roughly ±32px wide / -50px to 30px tall so labels
 python3 ~/.claude/skills/quest/quest.py status
 
 # Apply to a project
-python3 ~/.claude/skills/quest/quest.py theme limor your-theme
+python3 ~/.claude/skills/quest/quest.py theme apollo your-theme
 
 # Open the rendered map
-xdg-open http://localhost:8770/limor/route.html
+xdg-open http://localhost:8770/apollo/route.html
 ```
 
 If the renderer leaves `{{token}}` markers visible in the output, that's a substitution miss — check the spelling against the scope tables above.

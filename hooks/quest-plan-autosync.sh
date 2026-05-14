@@ -7,12 +7,14 @@
 #   - ~/.claude/plans/*.md
 #   - <project>/plans/*.md
 #   - <project>/.claude/plans/*.md
+#   - ~/.claude/quest/data/notes/*.md  (My To-Do sidecar — autosync render-only branch)
 
 INPUT=$(timeout 1 cat 2>/dev/null || true)
 FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 case "$FILE" in
   */.claude/plans/*.md|*/plans/*.md) ;;
+  */quest/data/notes/*.md) ;;
   *) exit 0 ;;
 esac
 

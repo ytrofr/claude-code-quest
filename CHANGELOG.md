@@ -2,6 +2,24 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] — 2026-05-14
+
+User-authored "My To-Do" sidecar + fenced-code diagram blocks.
+
+### Added
+
+- **My To-Do — per-quest user task sidecar.** A markdown file per quest at `~/.claude/quest/data/notes/<proj>__<quest>.md` holds your own todos + free-form notes, separate from the plan-derived task sections. Write `- [ ]` checkboxes directly in the file, or use the new `/quest todo` subcommand: `add`, `done`, `undone`, `rm`, `note`, `list`, `edit`. Renders as a green "My To-Do" section on the plan-card — open by default, empty-state hint when blank. autosync never plan-parses it; a write only triggers a re-render.
+- **Fenced code blocks in action bodies** — triple-backtick blocks in `## Section 13/14` action bodies render as monospace `<pre class="qd-diagram">` panels, so ASCII diagrams and visual maps stay aligned.
+- **Engine test suite** — `test_*.py` files alongside the engine (sidecar parser, `/quest todo` CLI, render layer, autosync notes-branch, integration) — 60 assertions.
+
+### Changed
+
+- Retired the unused `_user-tasks.html.tmpl` partial — superseded by the directly-writable My To-Do section.
+
+### Internal
+
+- New `sidecar.py` module — pure-function sidecar markdown parser + targeted file-edit helpers, shared by `quest.py` and `render.py`.
+
 ## [1.7.0] — 2026-05-13
 
 AI-resume briefings, link buckets, normalized type scale, live-claim pills.
@@ -19,7 +37,7 @@ AI-resume briefings, link buckets, normalized type scale, live-claim pills.
 - **Auto-bucketed links** in the Links section. URL pattern routes links into 6 collapsible groups: Try it · Code & commits · Learning entries · Project rules · Skills · Plan. Empty buckets hide automatically.
 - **Live-claim pills** on the quest-log page. For every active quest, shows a small "live: `<name>`" row listing the chosen names of CC sessions currently claiming the quest. Hidden when no sessions are working on it.
 - **Sidecar `.name` file** written next to each `.quest` claim by `/quest claim --session-name`. Survives independent of quest JSON mutations and supports multiple live sessions on the same quest (each session has its own sidecar).
-- **Name-based auto-claim**: `/quest claim --session-name <slug>` now substring-matches the slug against active quest ids before falling back to most-recently-touched. Launch `claude --name moshytz` and the quest containing "moshytz" gets claimed.
+- **Name-based auto-claim**: `/quest claim --session-name <slug>` now substring-matches the slug against active quest ids before falling back to most-recently-touched. Launch `claude --name build-login` and the quest containing "build-login" gets claimed.
 - **Render-time soft warn** lists active quests missing core fields (desc / kpi / why / next_step) to stderr. No block, just visibility.
 
 ### Changed
@@ -41,7 +59,7 @@ Plan-card render bug fixes surfaced by real quest data.
 - **Empty `Plan file:` footer** when a quest's `plan` field is `""` — the per-quest template emitted `Plan file: ~/.claude/plans/` with nothing after the slash. Now wrapped in `{{#if active.plan}}` so the line is omitted entirely when no plan is set. Both pokemon and storybook themes.
 - **Literal `{{q.url}}` / `{{q.label}}` template tokens** rendered in the Links section when a quest stored `links` as bare strings instead of `{url, label, desc}` objects. `render.py` now normalizes every link entry: dicts pass through with safe field fallbacks; strings become `{url, label, desc: ""}` so the partial's `{{#each}}` body resolves cleanly.
 - **X-axis overflow on plan-card** when KPI text was a 300+ char sentence. The KPI lived in a `.qd-pill` with `white-space: nowrap`; without `min-width: 0` the flex item refused to shrink and pushed the card past the 1280px frame. Fix in both themes: pills now allow flex shrink, and `.qd-pill-kpi` uses `white-space: normal` + `overflow-wrap: anywhere` so long KPI sentences wrap to multiple lines instead of clipping or overflowing.
-- **Long unbroken URL paths** in `.qd-link-label` (e.g. `~/shared/inter-agent/active/audit-gap-closure-launch-20260509.md`) caused horizontal overflow because the grid column was `1fr` (which won't shrink unbreakable tokens) and the label had no overflow handling. Both themes now use `grid-template-columns: minmax(0, 1fr) auto` and the label has `min-width: 0; overflow-wrap: anywhere; word-break: break-word`.
+- **Long unbroken URL paths** in `.qd-link-label` (e.g. a deep `~/.../active/some-long-thread-name.md` path) caused horizontal overflow because the grid column was `1fr` (which won't shrink unbreakable tokens) and the label had no overflow handling. Both themes now use `grid-template-columns: minmax(0, 1fr) auto` and the label has `min-width: 0; overflow-wrap: anywhere; word-break: break-word`.
 
 ## [1.6.1] — 2026-05-09
 
@@ -111,7 +129,7 @@ Sessions can bind themselves to a quest so the dashboard shows what's being work
 - `/quest unclaim` — release this session's claim, statusline reverts to auto-detect.
 - `/quest claimed` — print the current claim or auto-detect fallback.
 
-Session identity = `(claude_pid, /proc/<pid>/stat field-22 starttime ticks)` — deterministic per CC instance, no inter-agent bus dependency.
+Session identity = `(claude_pid, /proc/<pid>/stat field-22 starttime ticks)` — deterministic per CC instance, with no external dependency.
 
 `claimed_session_name` field on a quest gets stamped at claim time. The plan-card `<h2>` title renders `Quest Name (session-name)` when the kebab-cased session name differs from the quest id; otherwise just the quest name (no duplicate).
 
@@ -119,7 +137,7 @@ A standalone helper script for the Claude Code statusline (`scripts/statusline-q
 
 ### Added — `paths_map` separator-aware matching
 
-Auto-detect now matches a path_map prefix when cwd is exactly the prefix OR starts with `prefix` followed by a separator (`/`, `-`, `_`). One entry like `~/LimorAI` covers all sibling worktrees `LimorAI-Limor`, `LimorAI-staging`, etc. without overmatching `LimorAI2`. Resolved project is also validated against `quests.json` — aspirational path_map entries that don't have a corresponding dashboard project fall through to the dashboard root instead of emitting a 404 link.
+Auto-detect now matches a path_map prefix when cwd is exactly the prefix OR starts with `prefix` followed by a separator (`/`, `-`, `_`). One entry like `~/my-project` covers all sibling worktrees `my-project-feature`, `my-project-staging`, etc. without overmatching `my-project2`. Resolved project is also validated against `quests.json` — aspirational path_map entries that don't have a corresponding dashboard project fall through to the dashboard root instead of emitting a 404 link.
 
 ### Changed
 
@@ -202,6 +220,8 @@ No action required. Existing `quests.json` files render unchanged. To customize 
 
 Initial public release of the engine. See [v1.2.0 release notes](https://github.com/ytrofr/claude-code-quest/releases/tag/v1.2.0) for the full snapshot: pokemon + storybook themes, autosync hook, systemd unit, MIT license, SEO/AEO/GEO README, CITATION.cff, ISSUE_TEMPLATE.
 
+[1.8.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.6.2...v1.7.0
 [1.5.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/ytrofr/claude-code-quest/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/ytrofr/claude-code-quest/compare/v1.2.0...v1.4.0

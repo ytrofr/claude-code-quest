@@ -313,6 +313,10 @@ def extract_links(plan_text: str) -> list[dict]:
 _MD_INLINE_CODE = re.compile(r"`([^`\n]+)`")
 _MD_BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
 _MD_ITALIC = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
+# Fenced ``` blocks → <pre class="qd-diagram"> with whitespace preserved.
+# Lets plan §13/§14 action bodies carry ASCII diagrams / visual maps that
+# render monospaced + aligned (inline `code` collapses leading whitespace).
+_MD_FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
 
 
 def _escape_html(text: str) -> str:
@@ -335,6 +339,15 @@ def markdown_inline_to_html(body: str) -> str:
     body = body.strip()
     if not body:
         return ""
+
+    # 0. Stash fenced ``` blocks FIRST — their content must keep verbatim
+    #    whitespace + newlines (no <br> substitution, no leading-space collapse).
+    fence_tokens: list[str] = []
+    def _stash_fence(m: re.Match) -> str:
+        idx = len(fence_tokens)
+        fence_tokens.append(m.group(1).rstrip("\n"))
+        return f"\x00FENCE{idx}\x00"
+    body = _MD_FENCE.sub(_stash_fence, body)
 
     # 1. Stash markdown links FIRST as opaque tokens — they contain `(`/`[` which
     #    confuse later HTML-escape if we don't preserve their structure.
@@ -374,6 +387,7 @@ def markdown_inline_to_html(body: str) -> str:
     body = re.sub(r"\x00LINK(\d+)\x00", _unstash_link, body)
 
     # 6. Paragraph + line breaks. Blank line = paragraph break; single newline = <br>.
+    #    FENCE tokens carry no newlines so they ride through as inline text.
     paragraphs = re.split(r"\n\s*\n", body)
     rendered = []
     for p in paragraphs:
@@ -383,7 +397,16 @@ def markdown_inline_to_html(body: str) -> str:
         # Single-line newlines → <br>
         p = p.replace("\n", "<br>")
         rendered.append(f"<p>{p}</p>")
-    return "".join(rendered)
+    out = "".join(rendered)
+
+    # 7. Restore fenced blocks as <pre> AFTER paragraph wrapping, then unwrap any
+    #    <p> that ended up wrapping a <pre> (invalid nesting).
+    def _unstash_fence(m: re.Match) -> str:
+        idx = int(m.group(1))
+        return f'<pre class="qd-diagram">{_escape_html(fence_tokens[idx])}</pre>'
+    out = re.sub(r"\x00FENCE(\d+)\x00", _unstash_fence, out)
+    out = out.replace("<p><pre", "<pre").replace("</pre></p>", "</pre>")
+    return out
 
 
 def parse_actions(section_text: str) -> list[dict]:
@@ -831,6 +854,18 @@ def detect_depends_hint(plan_text: str, plan_path: Path, project: dict, new_ques
 
 def autosync(plan_path: Path) -> None:
     """Main: detect project, append-or-update quest, re-render. Never raises."""
+    # My To-Do sidecar write — NOT a plan. Re-render so the dashboard picks up
+    # the edited todos, then return: skip all plan-parsing (no project detect,
+    # no quest add/update, no quests.json mutation).
+    notes_dir = ROOT / "quest" / "data" / "notes"
+    try:
+        if notes_dir in plan_path.parents:
+            log_msg(f"RENDER notes-triggered ({plan_path.name})")
+            render_now()
+            return
+    except Exception as e:
+        log_msg(f"WARN notes-branch: {e}")
+
     if not plan_path.exists():
         log_msg(f"SKIP missing plan: {plan_path}")
         return
@@ -882,10 +917,13 @@ def autosync(plan_path: Path) -> None:
         return
 
     # ADD path — new plan, append quest
+    # I1: "current" is plural — never auto-lock based on existing currents.
+    # autosync runs without operator command, so it MUST NOT demote peers OR
+    # gate new quests behind existing-current count. New plan → new current.
+    # Regression: ~/.claude/skills/quest/test_current_is_plural.py (8 tests)
     n = len(project.get("quests", [])) + 1
     quest = derive_quest(plan_path, n)
-    has_current = any(q.get("status") == "current" for q in project["quests"])
-    quest["status"] = "locked" if has_current else "current"
+    quest["status"] = "current"
 
     # Initial parse of plan content + git meta
     update_existing_quest(quest, plan_path)

@@ -233,11 +233,18 @@
   .qd-tasks-summary-arrow { color: #ff6a3a; font-size: 13px; transition: transform 0.2s ease; opacity: 0.7; flex-shrink: 0; }
   details[open] > .qd-tasks-summary > .qd-tasks-summary-arrow { transform: rotate(90deg); opacity: 1; }
   .qd-tasks-summary-preview { font-weight: 600; font-size: 13px; color: #6a7a8a; font-style: italic; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qd-user-tasks { margin-top: 18px; padding: 16px 18px; background: #fff; border: 3px solid #5a8aa0; border-radius: 12px; }
-  .qd-user-tasks .qd-tasks-title { color: #2a5a8a; }
-  .qd-user-tasks .qd-tasks-count { color: #2a5a8a; }
-  .qd-user-tasks .qd-task-mark { border-color: #2a5a8a; }
-  .qd-user-tasks .qd-task-done .qd-task-mark { background: #5a8aa0; border-color: #2a5a8a; }
+  /* My To-Do — the user's own section. Green accent marks it as "yours". */
+  .qd-my-todo { margin-top: 18px; padding: 16px 18px; background: #f1fbf4; border: 3px solid #2e9a5a; border-radius: 12px; box-shadow: 0 3px 0 #1f7a44; }
+  .qd-my-todo .qd-tasks-title { color: #1a6a3a; }
+  .qd-my-todo .qd-tasks-count { color: #2e9a5a; }
+  .qd-my-todo .qd-tasks-summary-arrow { color: #2e9a5a; }
+  .qd-my-todo .qd-task-mark { border-color: #1f7a44; }
+  .qd-my-todo .qd-task-done .qd-task-mark { background: #2e9a5a; color: #fff; border-color: #1f7a44; }
+  .qd-my-todo.qd-my-todo-empty { background: #f1fbf4; border-style: dashed; border-width: 2px; box-shadow: none; opacity: 0.9; }
+  .qd-my-notes { margin-top: 12px; padding: 10px 12px; background: #fffdf2; border: 2px solid #c0a878; border-radius: 8px; }
+  .qd-my-notes-title { margin: 0 0 6px; font-weight: 700; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #6a7a8a; }
+  .qd-my-notes p { margin: 0 0 6px; font-size: 14px; line-height: 1.5; color: #2a3a4a; }
+  .qd-my-notes p:last-child { margin-bottom: 0; }
   /* Rich actions sections — Your Actions / Claude's Actions. Flat numbered list. */
   .qd-actions { margin-top: 22px; padding: 18px 20px; border: 3px solid #2a3a4a; border-radius: 12px; }
   .qd-actions-claude { background: rgba(91,180,216,0.08); border-color: #5a1818; }
@@ -260,6 +267,7 @@
   .qd-action-body p { margin: 0 0 6px; }
   .qd-action-body p:last-child { margin-bottom: 0; }
   .qd-action-body code { font-family: ui-monospace, monospace; background: #f7eed8; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .qd-action-body pre.qd-diagram { font-family: ui-monospace, monospace; white-space: pre; overflow-x: auto; background: #2a3a4a; color: #f7eed8; padding: 14px 16px; border-radius: 8px; border: 2px solid #1a2630; font-size: 12px; line-height: 1.35; margin: 8px 0; box-shadow: inset 0 1px 4px rgba(0,0,0,.3); }
   .qd-action-body a { color: #c44a2a; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c44a2a; }
   .qd-action-body a:hover { background: #ffd9b8; border-bottom-style: solid; }
   /* Status pill — colour buckets */
