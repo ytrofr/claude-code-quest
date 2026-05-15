@@ -20,7 +20,7 @@
       <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
       <h3 class="qd-tasks-title">My To-Do</h3>
       <span class="qd-tasks-count">{{my_todo_done}} / {{my_todo_total}}</span>
-      {{#if my_todo_next}}<span class="qd-tasks-summary-preview">Next: {{my_todo_next}}</span>{{/if}}
+      {{#if my_todo_next}}<span class="qd-tasks-summary-preview">Next: {{{my_todo_next_html}}}</span>{{/if}}
       {{#if my_todo_editor_href}}
       <a class="qd-my-todo-edit" href="{{my_todo_editor_href}}" title="Open sidecar in VS Code / Cursor / Windsurf"
          onclick="event.stopPropagation();">✎ Edit in editor</a>
@@ -31,7 +31,7 @@
       {{#each my_todo}}
       <li class="qd-task qd-task-{{q.done_class}}">
         <span class="qd-task-mark" aria-hidden="true">{{q.done_mark}}</span>
-        <span class="qd-task-title">{{q.title}}</span>
+        <span class="qd-task-title">{{{q.title_html}}}</span>
       </li>
       {{/each}}
     </ul>

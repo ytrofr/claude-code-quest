@@ -2,6 +2,34 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.10.0] — 2026-05-15
+
+Prompt-driven quest claim auto-rebind, tag editing on the plan-card detail page, inline markdown in the My To-Do list, WSL2-aware editor deeplinks.
+
+### Added
+
+- **Prompt-rebind hook** — new `hooks/quest-prompt-rebind.sh` registered on `UserPromptSubmit`. Reads the user's prompt + the last assistant message from the active session's transcript, scores against the project's `status="current"` quests with an IDF tokenizer, and atomically rewrites the session's claim file when the signal is strong. Two-stage decision (user-alone first, joined-context fallthrough, conflict guard), ~110-150ms typical latency, fire-and-forget. Companion `skills/quest/prompt_rebind_scorer.py` (the worker) and `skills/quest/test_prompt_rebind.py` (28-test regression suite).
+- **Three kill switches** for the rebind hook:
+  - **Per-session lock**: `quest claim --lock <proj> <qid>` writes a `.lock` sidecar next to the claim file. The hook honors it and logs `acted=locked-skip`. Clear with `quest unlock`.
+  - **Global dry-run**: `touch ~/.claude/quest/dry-run` — hook still scores and logs but never writes the claim file. Useful for tuning thresholds before activating.
+  - **Hard disable**: `touch ~/.claude/quest/prompt-rebind-disabled` — hook exits at the bash entry point with no scorer invocation.
+- **`quest unlock`** subcommand — removes the per-session lock sidecar without touching the claim itself.
+- **`quest rebind-stats [--days N]`** subcommand — summarizes recent hook activity from `~/.claude/quest/log/rebind.jsonl`: action distribution, "acted" distribution (rebound / locked-skip / rebound-dryrun / etc), threshold-tune candidates (rebinds with thin margin OR suggests near rebind threshold), and this session's actual rebinds with from→to provenance.
+- **`quest claim --lock`** flag — claim AND lock in one operation.
+- **Tag editing on the plan-card detail page.** The chip row (existing on the Quest Log) is now also on `plan-card.html?q=<qid>` — same `+ tag` button, `× to remove`, and `💬 + session` binding. Chips also link to `quest-log.html?q=<tag>` for filtered views.
+- **Inline markdown in My To-Do.** Task titles and notes now render `**bold**`, `*italic*`, and `` `inline code` ``. Hebrew + RTL text inside backticks preserved. Implementation: `sidecar.render_inline_md(text)`, applied per-line; templates use `{{{q.title_html}}}` for raw injection.
+
+### Changed
+
+- **Editor deeplink is now WSL2-aware.** On WSL2 (detected via `WSL_DISTRO_NAME`), the `✎ Edit in editor` link emits `vscode://vscode-remote/wsl+<distro><abs-path>` instead of `vscode://file/<abs-path>`. Native Linux / macOS still get the standard `vscode://file/` form. Fixes "path does not exist" when VS Code on Windows side handled a WSL absolute path.
+- **`<article class="qd-quest-block">` wrapper** in the plan-card render now carries `data-project-id` and `data-quest-tags` so the chip-edit JS can POST correctly.
+- **`.qd-task-title` styling** — explicit `font-size: 13px`, `line-height: 1.45`, `word-break: break-word`, and styled `<strong>` / `<em>` / `<code>` children. Fixes oversized prose-heavy task titles that broke the section layout.
+
+### Internal
+
+- New `prompt_rebind_scorer.py` module with bounded-I/O transcript tail-read (last 200KB, last 50 lines), IDF builder, two-stage `decide_action()`, and `run_from_stdin()` entry point. Soft-fails on every error path (missing transcript, no current quests, malformed JSON lines, /proc walk failure).
+- AppendOnly `~/.claude/quest/log/rebind.jsonl` observability log.
+
 ## [1.9.0] — 2026-05-15
 
 Freeform `tags[]` per quest, in-page search, session ribbon on the card image, "Open in editor" deeplink for My To-Do sidecars, and a small JSON API replacing the bare static server.

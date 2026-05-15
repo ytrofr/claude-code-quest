@@ -703,13 +703,19 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
         _sc_scope = _sidecar.my_todo_scope(_sidecar.parse_sidecar(_sc_text))
         q.update(_sc_scope)
         q["my_todo_empty"] = not _sc_scope["my_todo_has"]
-        # Editor-deeplink: vscode://file/<abs> — opens the sidecar in
-        # VS Code / Cursor / Windsurf. Empty when sidecar lookup failed.
-        # The template guards with {{#if my_todo_editor_href}} so missing
-        # paths just don't render the button.
+        # Editor-deeplink — opens the sidecar in VS Code / Cursor / Windsurf.
+        # WSL2: Windows-side VS Code can't resolve /home/<user>/... directly,
+        # so emit `vscode://vscode-remote/wsl+<distro><abs>` instead. Detected
+        # via WSL_DISTRO_NAME (Microsoft-injected since WSL 0.51.2). Native
+        # Linux / macOS get the normal vscode://file/<abs> form.
+        # Empty when sidecar lookup failed; template guards with {{#if}}.
         if _sc_path is not None:
             q["my_todo_file_path"] = str(_sc_path)
-            q["my_todo_editor_href"] = f"vscode://file/{_sc_path}"
+            _wsl_distro = os.environ.get("WSL_DISTRO_NAME", "")
+            if _wsl_distro:
+                q["my_todo_editor_href"] = f"vscode://vscode-remote/wsl+{_wsl_distro}{_sc_path}"
+            else:
+                q["my_todo_editor_href"] = f"vscode://file/{_sc_path}"
         else:
             q["my_todo_file_path"] = ""
             q["my_todo_editor_href"] = ""
@@ -1026,6 +1032,7 @@ def _render_quest_blocks(project: dict, theme: str) -> tuple[str, str, str]:
     body_tmpl = body_tmpl_path.read_text(encoding="utf-8")
 
     quests = project.get("quests", [])
+    project_id = project.get("id", "")
     blocks: list[str] = []
     for q in quests:
         scope = _quest_scope(project, q)
@@ -1033,11 +1040,16 @@ def _render_quest_blocks(project: dict, theme: str) -> tuple[str, str, str]:
         qid = q.get("id", "")
         qname = q.get("name", "")
         qn = q.get("n", "")
+        # tags_str = csv tags string, consumed by the chip-edit JS on the
+        # plan-card body. Empty string when the quest has no tags.
+        qtags_str = ",".join(q.get("tags") or [])
         blocks.append(
             f'<article class="qd-quest-block" '
+            f'data-project-id="{html.escape(project_id, quote=True)}" '
             f'data-quest-id="{html.escape(qid, quote=True)}" '
             f'data-quest-name="{html.escape(str(qname), quote=True)}" '
-            f'data-quest-n="{html.escape(str(qn), quote=True)}">'
+            f'data-quest-n="{html.escape(str(qn), quote=True)}" '
+            f'data-quest-tags="{html.escape(qtags_str, quote=True)}">'
             f"{body}</article>"
         )
 

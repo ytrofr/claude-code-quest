@@ -156,12 +156,35 @@ def parse_sidecar(text: str) -> dict:
     return {"todos": todos, "notes": notes, "has_content": bool(todos or notes)}
 
 
-def render_notes_html(notes: str) -> str:
-    """Render raw notes text to safe HTML: every value HTML-escaped, single
-    newline -> <br>, blank-line-separated blocks -> separate <p> paragraphs.
+# Inline markdown patterns. Applied AFTER HTML escaping so the raw markdown
+# delimiters (`** * `) work on escaped content. Order matters: code first
+# (so its contents aren't reinterpreted), then bold, then italic.
+_MD_CODE = re.compile(r"`([^`\n]+)`")
+_MD_BOLD = re.compile(r"\*\*([^*\n]+?)\*\*")
+_MD_ITALIC = re.compile(r"(?<!\*)\*([^*\n]+?)\*(?!\*)")
 
-    The sidecar is untrusted user input — no markdown is interpreted in v1,
-    everything is escaped.
+
+def render_inline_md(text: str) -> str:
+    """Render a SINGLE line of inline markdown to safe HTML.
+
+    Supports: **bold**, *italic*, `code`. Everything else is HTML-escaped.
+    Used by task titles + line-level renders. Multi-line input is handled
+    by callers (split on \\n first).
+    """
+    if not text:
+        return ""
+    out = _html.escape(text)
+    # Inline code FIRST so its contents are not reinterpreted as bold/italic
+    out = _MD_CODE.sub(lambda m: f"<code>{m.group(1)}</code>", out)
+    out = _MD_BOLD.sub(lambda m: f"<strong>{m.group(1)}</strong>", out)
+    out = _MD_ITALIC.sub(lambda m: f"<em>{m.group(1)}</em>", out)
+    return out
+
+
+def render_notes_html(notes: str) -> str:
+    """Render raw notes text to safe HTML: HTML-escape, then apply inline
+    markdown (** * `), single newline -> <br>, blank-line-separated blocks
+    -> separate <p> paragraphs.
     """
     notes = notes.strip()
     if not notes:
@@ -171,7 +194,9 @@ def render_notes_html(notes: str) -> str:
         para = para.strip()
         if not para:
             continue
-        out.append(f"<p>{_html.escape(para).replace(chr(10), '<br>')}</p>")
+        # Render inline markdown per-line so <br> stays between lines
+        rendered_lines = [render_inline_md(line) for line in para.split("\n")]
+        out.append(f"<p>{'<br>'.join(rendered_lines)}</p>")
     return "".join(out)
 
 
@@ -194,17 +219,20 @@ def my_todo_scope(parsed: dict) -> dict:
             next_title = t["title"]
         todos.append({
             "title": t["title"],
+            "title_html": render_inline_md(t["title"]),
             "done": done,
             "done_class": "done" if done else "todo",
             "done_mark": "✓" if done else "",
         })
     if len(next_title) > 80:
         next_title = next_title[:80] + "…"
+    next_title_html = render_inline_md(next_title)
     return {
         "my_todo": todos,
         "my_todo_done": done_count,
         "my_todo_total": len(todos),
-        "my_todo_next": next_title,
+        "my_todo_next": next_title,                        # raw — for plain-text briefing
+        "my_todo_next_html": next_title_html,              # markdown-rendered for HTML preview
         "my_notes": parsed["notes"],                       # raw — for plain-text briefing
         "my_notes_html": render_notes_html(parsed["notes"]),
         "my_todo_has": parsed["has_content"],
