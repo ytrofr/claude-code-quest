@@ -92,7 +92,8 @@ HOISTED_QUEST_FIELDS = (
     "actions_user", "actions_user_done", "actions_user_total", "actions_user_next", "actions_user_next3", "actions_user_empty",
     "branch", "last_commit",
     "last_touched", "last_touched_human", "why", "blockers_str",
-    "tags_str", "tags_pretty", "kpi", "depends_on", "depends_on_str", "depends_on_html",
+    "tags_str", "tags_pretty", "session_tags_html", "has_session_tags",
+    "kpi", "depends_on", "depends_on_str", "depends_on_html",
     "successors_str", "successors_html", "plans_html", "plans_count",
     "dep_blocked",
     "links", "link_buckets", "effort", "problem", "solution",
@@ -104,6 +105,7 @@ HOISTED_QUEST_FIELDS = (
     # My To-Do sidecar — user-authored todos + notes (quest/data/notes/<proj>__<qid>.md)
     "my_todo", "my_todo_done", "my_todo_total", "my_todo_next",
     "my_notes", "my_notes_html", "my_todo_has", "my_todo_empty",
+    "my_todo_file_path", "my_todo_editor_href",  # editor deeplink (vscode://file/...)
 )
 
 
@@ -468,7 +470,7 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
                 title = next_task.get("title", "")
                 q["tasks_next"] = title[:80] + ("…" if len(title) > 80 else "")
         # Rich action items (new format — `### N. Title [STATUS]` from §13/§14).
-        # Two parallel arrays: actions (Claude's actions) + actions_user (the user's).
+        # Two parallel arrays: actions (Claude's actions) + actions_user (Yatir's).
         # Each item has {n, title, status, status_class, body_html}.
         # SYNTHESIS: legacy quests with tasks[] but no actions[] get auto-converted
         # so the rich UI shows for ALL quests. Synthesised actions have:
@@ -599,10 +601,39 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
         # Joined string fields (templates need pre-joined for {{#if}} truthiness)
         if q.get("blockers"):
             q["blockers_str"] = ", ".join(q["blockers"])
+        # tags_str / tags_pretty / session_tags MUST default to empty so the
+        # template never renders the literal "{{q.tags_str}}" marker on quests
+        # without a tags field. _resolve() leaves missing paths visible by
+        # design (intentional bug indicator) — these defaults silence that
+        # while still rendering correctly when tags are present.
         if q.get("tags"):
             q["tags_str"] = ", ".join(q["tags"])
-            # Human-readable: hyphens in tag tokens → spaces, joined with " · ".
             q["tags_pretty"] = " · ".join(t.replace("-", " ") for t in q["tags"])
+            # session:* tags surface separately on the card .illus area, not
+            # just in the chip row. We pre-render the HTML here because the
+            # template engine doesn't support nested {{#each}} (its non-greedy
+            # regex collapses on inner blocks). Same trick `live_claims_html`
+            # uses on this scope. Injected via {{{q.session_tags_html}}}.
+            _sess_html_parts = []
+            for t in q["tags"]:
+                if t.startswith("session:") and len(t) > 8:
+                    label = t[8:]
+                    _sess_html_parts.append(
+                        '<span class="qd-session-pill" data-tag="'
+                        + html.escape(t, quote=True)
+                        + '" title="Bound to conversation: '
+                        + html.escape(label, quote=True)
+                        + '"><span class="qd-session-label">'
+                        + html.escape(label)
+                        + "</span></span>"
+                    )
+            q["session_tags_html"] = "".join(_sess_html_parts)
+            q["has_session_tags"] = bool(_sess_html_parts)
+        else:
+            q["tags_str"] = ""
+            q["tags_pretty"] = ""
+            q["session_tags_html"] = ""
+            q["has_session_tags"] = False
 
         # ---- 2026-05-13 NEW FIELDS — normalize and render-friendly forms ----
         # files_touched: accept "path" string or {path, role} dict.
@@ -667,10 +698,21 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
             _sc_path = _sidecar.sidecar_path(project_id, q.get("id", ""))
             _sc_text = _sc_path.read_text(encoding="utf-8") if _sc_path.exists() else ""
         except OSError:
+            _sc_path = None
             _sc_text = ""
         _sc_scope = _sidecar.my_todo_scope(_sidecar.parse_sidecar(_sc_text))
         q.update(_sc_scope)
         q["my_todo_empty"] = not _sc_scope["my_todo_has"]
+        # Editor-deeplink: vscode://file/<abs> — opens the sidecar in
+        # VS Code / Cursor / Windsurf. Empty when sidecar lookup failed.
+        # The template guards with {{#if my_todo_editor_href}} so missing
+        # paths just don't render the button.
+        if _sc_path is not None:
+            q["my_todo_file_path"] = str(_sc_path)
+            q["my_todo_editor_href"] = f"vscode://file/{_sc_path}"
+        else:
+            q["my_todo_file_path"] = ""
+            q["my_todo_editor_href"] = ""
 
         # Build briefing markdown for the Copy-briefing button + .md endpoint.
         # Must run AFTER all normalizations above so it captures the final shape.
@@ -1058,14 +1100,20 @@ def render_project(project: dict, theme: str) -> dict:
 # `accent` / `icon` fields on a project in quests.json. Fallback when a project
 # isn't in this map: rotate through ACCENT_PALETTE / ICON_ROTATION by index.
 DEFAULT_ACCENTS: dict[str, str] = {
-    "apollo": "#ff6a3a",
-    "atlas":  "#3aaa6a",
-    "nova":   "#9a6ace",
+    "limor":    "#ff6a3a",
+    "smith":    "#3aaa6a",
+    "ogas":     "#9a6ace",
+    "gamify":   "#e8b430",
+    "logivote": "#3a8aa0",
+    "remotion": "#c44a2a",
 }
 DEFAULT_ICONS: dict[str, str] = {
-    "apollo": "house",
-    "atlas":  "tower",
-    "nova":   "castle",
+    "limor":    "house",
+    "smith":    "camp",
+    "ogas":     "castle",
+    "gamify":   "camp",
+    "logivote": "cave",
+    "remotion": "tower",
 }
 ACCENT_PALETTE: list[str] = ["#ff6a3a", "#3aaa6a", "#9a6ace", "#e8b430", "#3a8aa0", "#c44a2a", "#5db4d8", "#ffd24a"]
 ICON_ROTATION: list[str] = ["house", "camp", "castle", "cave", "tower", "bridge", "mill"]

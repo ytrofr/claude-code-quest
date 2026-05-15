@@ -30,7 +30,7 @@ Visualize your projects as gamified RPG maps. Each project gets a themed dashboa
 
 ### Failure log — why this rule is in screaming red
 
-**A real incident**: an agent ran `quest reset <project> --chapter <name> --clean --yes` during a routine reset. The operator had NOT typed `--clean` and had NOT authorized wiping locked quests — they had asked for a "fresh start" framing a new phase. The `--clean` flag archived 25 LOCKED future-work quests, including one the operator was actively waiting on. Restoration required a multi-step manual JSON patch of 25 entries. This was a VIOLATION of Safety Invariant I1 below, which already covered the case — the agent had the rule loaded and ran the command anyway. That is why this rule is in screaming red.
+**2026-05-11 (OGAS, Phase 9 → Phase 10 pivot)**: Claude ran `quest reset ogas --chapter phase-9-archived --clean --yes` during a routine reset. Operator had NOT typed `--clean` and had NOT authorized wiping locked quests — they had asked for a "fresh new session" framing the Phase 10 pivot. The `--clean` flag archived 25 LOCKED future-work quests, including `g-primary-6-visual-verdict-cafe-malben-moshytz` (#21) which the operator was actively waiting on. Operator had to ask "where is this fucking quest" before noticing the loss. Restoration required manual JSON patching of 25 entries. Operator's verbatim demand: **"YOU NEVER EVER EVER DO THIS UNLESS I SAY EXPLICITLY."** This was a VIOLATION of Safety Invariant I1 below, which already covered the case — Claude had the rule loaded and ran the command anyway. Making the rule more prominent and adding this failure log.
 
 ---
 
@@ -71,7 +71,7 @@ Priority for new quest `name`:
 
 **Forbidden**: deriving the `id` from the plan FILE name. Plan `i-want-to-plan-pending-layout-queue.md` → BAD id `i-want-to-plan-pending-layout-queue`. The file name is the prompt that birthed the plan; the H1 is the title.
 
-**Autosync exception — the file-name DOES become the id.** `autosync` (fired on any write of a plan file carrying `**Project**: <id>`) creates a quest whose `id` = kebab of the plan **file name** — the one path that violates the rule above. Consequence: writing a plan file AND hand-creating a quest with a different id → autosync spawns a DUPLICATE stub (missing kpi/why/next_step). **Mitigation**: name the plan FILE to match your intended quest `id`. If they already diverged, `mv` the file to match, then delete the stub (destructive — operator OK per I1). Evidence: a plan file `<feature>-multi-model.md` auto-spawned a duplicate of a hand-built quest `<feature>`; fixed by renaming the file.
+**Autosync exception — the file-name DOES become the id.** `autosync` (fired on any write of a plan file carrying `**Project**: <id>`) creates a quest whose `id` = kebab of the plan **file name** — the one path that violates the rule above. Consequence: writing a plan file AND hand-creating a quest with a different id → autosync spawns a DUPLICATE stub (missing kpi/why/next_step). **Mitigation**: name the plan FILE to match your intended quest `id`. If they already diverged, `mv` the file to match, then delete the stub (destructive — operator OK per I1). Evidence: OGAS 2026-05-14 — `moshytz-variant-engine-multi-model.md` auto-spawned a dup of the hand-built `moshytz-variant-engine`; fixed by renaming the file.
 
 ### I3 — Full schema payload on every `add` — NEVER stub
 
@@ -91,6 +91,7 @@ Every quest creation MUST populate these fields. Missing fields = stub = operato
 | `why`          | 1-3 sentences stating the PROBLEM (not the solution). REQUIRED                                                     |
 | `kpi`          | 1 sentence: how success is measured. REQUIRED                                                                      |
 | `tasks[]`      | extracted from plan §13 Post-Validation checkboxes, OR session milestones. MIN 3 items                             |
+| `tasks_user[]` | REQUIRED WHEN APPLICABLE — quest has operator-facing actions (decisions/approvals/eyeball gates). Extracted from plan §14 User Actions checkboxes by autosync. Renders as "Your Actions" on the card; `tasks[]` renders as "Claude's Actions". |
 | `branch`       | `git branch --show-current` of the working directory. REQUIRED if work is on a branch                              |
 | `last_commit`  | `{sha, msg, date}` from `git log -1` of the work area. REQUIRED if any commits exist                               |
 | `tags[]`       | 3-7 keyword tags                                                                                                   |
@@ -125,16 +126,16 @@ Stub quests (`/quest add <proj> "<name>" --next "..."` and nothing else) are FOR
 
 5. **Live state probes — MANDATORY (failure OK and surfaces; SKIPPING FORBIDDEN)**:
    - **Dogfood URL probe** (HEAD with GET fallback): if `quest.links[]` has a dogfood URL on `localhost:8000`, run `curl -sI -m 3 -o /dev/null -w "%{http_code}" <url>`. Any HTTP response code (2xx/3xx/4xx) → `dogfood_reachable: yes (<code>)`. Only `000` or no response → `dogfood_reachable: no (timeout/refused)`. Don't treat 4xx as failure — the server is up.
-   - **Peer activity scan** (OPTIONAL — only if you run multiple agent sessions and keep coordination logs): search your agent-coordination directory's active thread files for the project/quest, sorted by recency (most-recent first):
+   - **Peer bus scan** (search active thread bodies — sorted by recency, NOT alphabetical; telemetry at `log/v2/*.jsonl` is NOT the target):
      ```bash
-     # Adjust the path to wherever your multi-agent setup keeps coordination logs.
-     ls -t ~/.claude/agent-coordination/active/*.md 2>/dev/null | \
+     # Sort active/*.md by mtime DESC, grep for project/quest mention, take top 3
+     ls -t ~/shared/inter-agent/active/*.md 2>/dev/null | \
        xargs grep -l -i "<qid>\|<proj>" 2>/dev/null | head -3
      ```
-     For each hit, read the tail and surface in summary: `peer_activity: thread <basename> last <mtime> — "<last message excerpt>"`. If none (or you don't run multi-agent sessions): `peer_activity: none`.
+     For each hit, read tail 10 lines and surface in summary: `peer_activity: thread <basename> last <mtime> — "<last message excerpt>"`. If none: `peer_activity: none`. Fallback if no `active/` hits: grep aggregate `~/shared/inter-agent/log.jsonl` for last 5 entries mentioning the project.
 
-   Recency-sort matters — newest coordination thread is the one that signals collision risk.
-   - These probes cost <1 second total. They keep multi-session work safe — a peer session may have uncommitted work in shared files; the scan catches it BEFORE you start.
+   The mtime-sort is critical — alphabetical order surfaces stale threads (`coord-limor-...` before `coord-sigma-s3-s4-20260506-...`). Recent peer activity is what matters for collision detection.
+   - These probes COST <1 second total. They are how multi-session coord stays safe — peer s4 may have uncommitted work in shared files; bus scan catches it BEFORE you start work.
 
 6. **Summarize in ≤200 words** using the template below. Summary MUST include `git_verified` + `dogfood_reachable` + `peer_activity` lines (even if "yes/yes/none").
 7. **Confirm/proceed**:
@@ -195,38 +196,40 @@ Begin? (yes / pick different / show more)
 - DON'T modify `quests.json` during resume — read-only.
 - DON'T fetch the plan-card URL itself — the URL is a TRIGGER PATTERN, the data lives in `quests.json` + the plan file. Reading the rendered HTML is lossy.
 - DON'T quote `quest.last_commit.sha` as ground truth without verifying via `git log -1 --format=%h` — the cached value drifts as commits land in subsequent sessions. **Always verify, never trust cached.**
-- DON'T skip the dogfood HEAD probe because it "feels optional". It is a MANDATORY pre-summary probe — failure is OK and surfaces in the summary, but skipping is FORBIDDEN. (The peer-activity scan is optional — only if you run multiple agent sessions.)
+- DON'T skip the dogfood HEAD probe or peer-bus scan because they "feel optional". They are MANDATORY pre-summary probes — failure is OK and surfaces in the summary, but skipping is FORBIDDEN. The peer-bus scan is how multi-session coordination stays safe.
 
 ### Worked example
 
-Operator pastes `http://localhost:8770/apollo/plan-card.html?q=build-login-oauth` in a fresh session.
+Operator pastes `http://localhost:8770/ogas/plan-card.html?q=grid-layout-ui-mockup` in a fresh session.
 
 Routine:
 
 ```
-1. Parse: proj=apollo, qid=build-login-oauth
-2. Read ~/.claude/quest/data/quests.json → find quest #4, status=current, progress=0.6
-3. Read quest.plan: ~/.claude/plans/apollo-login.md (read fully)
+1. Parse: proj=ogas, qid=grid-layout-ui-mockup
+2. Read ~/.claude/quest/data/quests.json → find quest #38, status=current, progress=0.85
+3. Read quest.plan: ~/.claude/plans/i-want-to-plan-pending-layout-queue.md (321 lines)
 4. MANDATORY git verify:
    - git log -1 --format=%h → "4f3d64e"; quest.last_commit.sha → "4f3d64e" ✅ MATCH → git_verified: yes
-   - branch=feat/login matches quest.branch ✅
+   - branch=dev-websites matches quest.branch ✅
    - git status --short → clean (or list uncommitted)
-5. MANDATORY live probe:
-   - curl -sI -m 3 http://localhost:8000/<dogfood-url> → HTTP 200 → dogfood_reachable: yes
-   - peer-activity scan (optional) → peer_activity: none
+5. MANDATORY live probes:
+   - curl -sI -m 3 http://localhost:8000/api/v1/pages/published/... → HTTP 200 → dogfood_reachable: yes
+   - grep -l "grid-layout-ui-mockup\|ogas" ~/shared/inter-agent/active/*.md | head -3 →
+     finds active/coord-sigma-s3-s4-20260506.md → tail 10 lines →
+     peer_activity: thread coord-sigma-s3-s4-20260506 last 2026-05-11T14:04:32Z from sigma:s4 — "v2A v3 PIVOT landed locally. Operator: 'i dont like that the css inspector is a new panel...'"
 6. Summarize using template — INCLUDES git_verified + dogfood_reachable + peer_activity lines
-7. Ask: "Begin: wire the OAuth callback handler?"
+7. Ask: "Begin Phase 5 — AST contracts (4 tests) + 4 Playwright E2E? Note: peer sigma:s4 has uncommitted v2A v3 work in shared files."
 ```
 
-**Key point**: the routine surfaces git drift, dogfood reachability, and peer activity to the operator BEFORE work begins — so a fresh session never starts work on a stale or contended quest.
+**Key difference from a "best-effort skip" routine**: step 7 surfaces the peer activity to the operator BEFORE work begins. Without the mandatory bus scan, the new session might start Phase 5 work that collides with peer s4's uncommitted page_helpers.py edits.
 
 ### Evidence — why these invariants exist
 
-Real incidents that shaped I1/I2/I3:
+2026-05-11 OGAS Entry #450:
 
-1. A reset session ran `quest reset <project> --chapter <name>` without an operator-explicit command. All in-flight quests were archived with no soft-warn. The operator interpreted it as data loss; manual JSON restoration was required. → I1.
-2. A quest was created with its `id` derived from the plan FILE name instead of the plan's H1 title — the operator wanted the quest named what they were thinking of, not the filename. → I2.
-3. Early quests were created with only `--next "..."` populated — no `why`, `kpi`, `tasks[]`, `links[]` — and needed a full re-pack later when context was needed. → I3.
+1. Phase 9 pivot session ran `quest reset ogas --chapter phase-7-8-archived` without operator-explicit command. All 34 in-flight OGAS quests archived. No soft-warn surfaced. Operator on next session interpreted as deletion — "where are all OGAS quests gone?!?!?!?!??!". Manual JSON restoration required.
+2. Same day, a quest was created as `i-want-to-plan-pending-layout-queue` — the plan FILE name. The actual plan H1 was different. Operator demanded the quest be named what the operator was thinking (`grid-layout-ui-mockup`).
+3. Earlier-created quests had only `--next "..."` populated — no `why`, `kpi`, `tasks[]`, `links[]`. Required full re-pack later when context was needed.
 
 All three failure modes encoded into I1/I2/I3.
 
@@ -244,8 +247,46 @@ All three failure modes encoded into I1/I2/I3.
 | `/quest render`                                        | Regenerate all HTML                                                                                |
 | `/quest reset <project> --chapter <name>`              | **Preview only by default.** Pass `--yes`/`-y` to actually archive. `--clean` archives locked too. |
 | `/quest chapters [<project>]`                          | List archived chapters (one or all projects)                                                       |
+| `/quest tag <project> <quest> add foo,bar`             | Append freeform tags. Allowed chars: `A-Z a-z 0-9 _ : . / -` (max 64).                            |
+| `/quest tag <project> <quest> remove foo`              | Remove a tag.                                                                                      |
+| `/quest tag <project> <quest> list`                    | Show all tags on the quest.                                                                        |
+| `/quest bind <project> <quest> [--session-name X]`     | Add `session:<name>` linking THIS chat to a quest. Renders a 💬 ribbon on the card image.          |
+| `/quest unbind [<project> <quest>] [--session-name X]` | Remove THIS session's tag — from one quest, or every quest carrying it.                            |
+| `/quest mine [--session-name X]`                       | List every quest tagged with this session's name.                                                  |
 
 After every mutating command, the renderer runs automatically.
+
+## Tags + Session Binding — UI + CLI + API
+
+Every quest carries an optional freeform `tags[]` array. Tags appear as chips below the quest name on the Quest Log; tags starting with `session:` also render as a 💬 ribbon inside the `.illus` SVG area for high-glance visibility.
+
+### Three ways to manage tags
+
+| From | Action |
+|---|---|
+| **UI — chip row** | `+ tag` on a card → inline input → `Enter` to commit (accepts comma-separated). `×` on any chip removes. Click a chip body to filter the list by that tag. |
+| **UI — `💬 + session`** | Cleaner binding entry. Type just the conversation name; `session:` is auto-prefixed. Page reloads to surface the `.illus` ribbon. |
+| **CLI** | `quest tag/bind/unbind/mine` (see Quick reference). |
+
+### JSON API (POST, localhost-only)
+
+```
+POST /api/tags/add      {"project":"<p>","id":"<q>","tag":"foo,bar"}
+POST /api/tags/remove   {"project":"<p>","id":"<q>","tag":"foo"}
+POST /api/tags/bind     {"project":"<p>","id":"<q>","name":"chat-name"}
+POST /api/tags/unbind   {"project":"<p>","id":"<q>"}
+GET  /api/session       — diagnostic: current server's session_key/label
+```
+
+Backed by `~/.claude/skills/quest/server.py` (replaces `python3 -m http.server`). Atomic JSON write under a single writer lock; in-process re-render after each mutation.
+
+### Search bar
+
+Live keyword filter at the top of every Quest Log. Searches name / desc / tags / id / status simultaneously, debounced, persists in `?q=` for shareable URLs. `Esc` or `✕` clears.
+
+### My To-Do editor deeplink
+
+Each plan-card My To-Do section emits an `✎ Edit in editor` button (vscode://file/<abs>) so VS Code / Cursor / Windsurf opens the exact sidecar file. Works for populated and empty-state sidecars.
 
 ## How to invoke
 
@@ -518,11 +559,11 @@ Output format (last field): `quest:<short-tag>`. The tag is wrapped in an [OSC-8
 
 Tag shortening — long quest ids truncate at 22 chars with `…`:
 
-| Tag                                  | URL it opens                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| `quest:apollo/build-login-oauth-flo…` | `http://localhost:8770/apollo/plan-card.html?q=build-login-oauth-flow`     |
-| `quest:apollo/-` (no current quest)   | `http://localhost:8770/apollo/`                                           |
-| `quest:-` (no project from cwd)       | `http://localhost:8770/`                                                  |
+| Tag                                | URL it opens                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------- |
+| `quest:ogas/layout-editor-entry-…` | `http://localhost:8770/ogas/plan-card.html?q=layout-editor-entry-435-soak-ship` |
+| `quest:ogas/-` (no current quest)  | `http://localhost:8770/ogas/`                                                   |
+| `quest:-` (no project from cwd)    | `http://localhost:8770/`                                                        |
 
 ### Recommended SessionEnd hook (auto-unclaim)
 
@@ -572,11 +613,11 @@ Output comparison:
 
 ```
 # Default (2-line — requires ~30+ row terminal):
-Apollo | Opus 4.7 | 5h:71%→14:00 7d:44%
-quest: apollo/build-login-oauth · oauth-flow  →  http://localhost:8770/...
+AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1
+quest: smith/whatsapp-auth-split · audit-gap-closure  →  http://localhost:8770/...
 
 # Compact (1-line — fits any terminal):
-Apollo | Opus 4.7 | 5h:71%→14:00 7d:44% | quest: apollo/build-login-oauth · oauth-flow
+AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1 | quest: smith/whatsapp-auth-split · audit-gap-closure
 ```
 
 ### Files involved

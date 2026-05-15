@@ -15,6 +15,7 @@ Usage examples:
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,7 +38,7 @@ DASHBOARD_URL = "http://localhost:8770"
 # a process whose comm == "claude". Its (pid, raw starttime ticks) form a
 # stable, deterministic key for the lifetime of that CC instance.
 #
-# Why not an external session registry? It can carry stale entries for sessions
+# Why not bus identity? The inter-agent registry has stale entries for sessions
 # whose SessionStart hook didn't register (or whose claude_pid rolled). Walking
 # /proc directly is more robust + dependency-free.
 def _walk_to_claude() -> tuple[int, str] | None:
@@ -91,6 +92,56 @@ def session_key() -> str | None:
 
 def claim_file_for(key: str) -> Path:
     return RUN / f"session-{key}.quest"
+
+
+def _gc_dead_session_claims() -> int:
+    """Remove session-<key>.quest files whose underlying claude process is gone.
+
+    Walks RUN dir, parses each session-<pid>-<ticks>.quest, verifies:
+      - /proc/<pid>/comm reads as "claude" (process exists + is claude)
+      - /proc/<pid>/stat field 22 (starttime ticks) matches the claimed ticks
+        (catches PID reuse: a different claude proc reusing the same PID has
+        different starttime ticks).
+
+    Either check failing → the claim is dead, delete the file. Best-effort;
+    individual delete failures are swallowed. Returns count removed.
+
+    Called opportunistically from cmd_claim / cmd_status / cmd_render — keeps
+    the run/ dir tidy without needing a cron. Idempotent + cheap (one
+    /proc read per file).
+
+    Evidence: 2026-05-15 — 6 stale claim files accumulated in ~/.claude/quest/run/
+    pointing to dead CC sessions; no eviction mechanism existed before this.
+    """
+    if not RUN.exists():
+        return 0
+    removed = 0
+    for f in RUN.glob("session-*.quest"):
+        m = re.match(r"session-(\d+)-(\d+)\.quest$", f.name)
+        if not m:
+            continue
+        pid, ticks_claimed = int(m.group(1)), m.group(2)
+        is_dead = False
+        try:
+            comm = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
+            if comm != "claude":
+                is_dead = True
+            else:
+                stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+                stat_clean = re.sub(r"\([^)]*\)", "X", stat, count=1)
+                fields = stat_clean.split()
+                if len(fields) < 22 or fields[21] != ticks_claimed:
+                    is_dead = True
+        except (OSError, IndexError, ValueError):
+            is_dead = True
+        if is_dead:
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
 
 LANDMARKS = ["house", "tower", "mill", "bridge", "camp", "cave", "castle"]
 
@@ -154,6 +205,12 @@ def find_quest(project: dict, qid: str) -> dict:
 # ---- subcommands ----
 
 def cmd_status(args) -> int:
+    # Opportunistic GC: cmd_status is the most-called read endpoint. Sweep dead
+    # session claim files on every invocation. Best-effort + silent on noise.
+    try:
+        _gc_dead_session_claims()
+    except Exception:
+        pass
     data = load()
     themes = list_themes()
     print(f"Dashboard: {DASHBOARD_URL}")
@@ -219,6 +276,28 @@ def cmd_add(args) -> int:
     project["quests"].append(quest)
     save(data)
     print(f"Added: {args.project_id}/{qid} (#{n}, {landmark}, {status})")
+
+    # Auto-claim THIS session for the newly-added quest — prevents stale-claim
+    # drift where a long-running CC session keeps an old claim while the
+    # operator pivots to a new work topic. Opt out with --no-claim or
+    # env QUEST_AUTO_CLAIM_ON_ADD=0.
+    # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
+    # actually working on dorian-investors-landing; statusline showed the wrong
+    # quest, operator only caught it by glancing at the card URL.
+    try:
+        no_claim = getattr(args, "no_claim", False) or \
+                   os.environ.get("QUEST_AUTO_CLAIM_ON_ADD", "1") == "0"
+        if not no_claim:
+            key = session_key()
+            if key:
+                RUN.mkdir(parents=True, exist_ok=True)
+                claim_file_for(key).write_text(
+                    f"{args.project_id}/{qid}\n", encoding="utf-8"
+                )
+                print(f"Claimed: {args.project_id}/{qid} (session auto-rebind)")
+    except Exception:
+        pass  # best-effort — never break add on claim-write failure
+
     return render_now()
 
 
@@ -274,6 +353,27 @@ def cmd_update(args) -> int:
         changes.append(f"links+={len(args.add_link)}")
     save(data)
     print(f"Updated {args.project_id}/{args.quest_id}: {', '.join(changes) if changes else '(no changes)'}")
+
+    # Auto-claim THIS session when the quest is being SET to current — mirror
+    # of cmd_add's auto-claim. Closes the gap where /quest update X --status
+    # current would NOT update the claim file, leaving the statusline stuck on
+    # whatever the old claim pointed to (the 2026-05-14 entry-460 / 2026-05-15
+    # moshytz-variant-engine recurrence both hit this). Opt out with
+    # env QUEST_AUTO_CLAIM_ON_UPDATE=0.
+    try:
+        if args.status == "current":
+            no_claim = os.environ.get("QUEST_AUTO_CLAIM_ON_UPDATE", "1") == "0"
+            if not no_claim:
+                key = session_key()
+                if key:
+                    RUN.mkdir(parents=True, exist_ok=True)
+                    claim_file_for(key).write_text(
+                        f"{args.project_id}/{args.quest_id}\n", encoding="utf-8"
+                    )
+                    print(f"Claimed: {args.project_id}/{args.quest_id} (session auto-rebind)")
+    except Exception:
+        pass  # best-effort — never break update on claim-write failure
+
     return render_now()
 
 
@@ -580,8 +680,8 @@ def auto_detect_quest(cwd: str | None = None) -> tuple[str | None, str | None]:
     pid = None
     # Match prefix when cwd is exactly the prefix OR starts with `prefix`
     # followed by a separator (`/`, `-`, `_`). Lets one entry like
-    # `~/my-project` cover all worktrees `my-project-feature`, `my-project-staging`,
-    # while rejecting `my-project2` / `my-projectxyz`.
+    # `~/LimorAI` cover all worktrees `LimorAI-Limor`, `LimorAI-staging`,
+    # while rejecting `LimorAI2` / `LimorAIxyz`.
     for prefix, candidate in _path_map():
         prefix = prefix.rstrip("/")
         if cwd == prefix or any(cwd.startswith(prefix + sep) for sep in ("/", "-", "_")):
@@ -615,6 +715,13 @@ def _kebab(s: str) -> str:
 def cmd_claim(args) -> int:
     """Bind THIS session to a quest. With no args, claims whatever
     auto-detect would pick (locks it in even when focus drifts)."""
+    # GC dead-session claim files on every claim (cheapest moment to sweep —
+    # we're already writing run/ + the operator is intentionally touching the
+    # claim layer).
+    try:
+        _gc_dead_session_claims()
+    except Exception:
+        pass
     key = session_key()
     if not key:
         print("ERROR: could not resolve CC session identity (not running under claude?)",
@@ -774,6 +881,194 @@ def cmd_claimed(args) -> int:
     return 0
 
 
+_TAG_RE = re.compile(r"^[A-Za-z0-9_:./\-]{1,64}$")
+
+
+def _normalize_tag(raw: str) -> str:
+    """Same validation as server._normalize_tag — kept here for CLI use without
+    importing server (which would start the HTTP module-level state)."""
+    t = (raw or "").strip()
+    return t if t and _TAG_RE.match(t) else ""
+
+
+def _dedup_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in items:
+        if x and x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def cmd_tag(args) -> int:
+    """quest tag <project> <quest> add|remove|list <values...>
+
+    `add` / `remove` accept multiple comma-separated tokens. `list` ignores
+    extra args."""
+    action = args.action
+    data = load()
+    project = get_project(data, args.project_id)
+    quest = find_quest(project, args.quest_id)
+
+    if action == "list":
+        tags = quest.get("tags") or []
+        if not tags:
+            print("(no tags)")
+        else:
+            for t in tags:
+                print(t)
+        return 0
+
+    raw = ",".join(args.values or [])
+    candidates = [_normalize_tag(t) for t in raw.split(",")]
+    clean = [t for t in candidates if t]
+    if not clean:
+        print(f"ERROR: no valid tag values (allowed chars: A-Z a-z 0-9 _ : . / -, max 64)",
+              file=sys.stderr)
+        return 2
+
+    existing = list(quest.get("tags") or [])
+    if action == "add":
+        existing.extend(clean)
+        existing = _dedup_preserve_order(existing)
+    elif action == "remove":
+        existing = [t for t in existing if t not in clean]
+    else:
+        print(f"ERROR: unknown action '{action}'", file=sys.stderr)
+        return 2
+
+    if existing:
+        quest["tags"] = existing
+    elif "tags" in quest:
+        del quest["tags"]
+    save(data)
+    print(f"{action}: {', '.join(clean)}")
+    print(f"tags now: {', '.join(quest.get('tags') or []) or '(none)'}")
+    return render_now()
+
+
+def _bind_label_for_current_session(name_arg: str) -> tuple[str, str] | None:
+    """Resolve the friendly session label for `bind`.
+
+    Priority: explicit --session-name > current session's .name sidecar >
+    session_key (the raw pid-ticks identifier — readable but ugly).
+
+    Returns (tag, label) or None when nothing usable is available."""
+    label = (name_arg or "").strip()
+    if not label:
+        key = session_key()
+        if key:
+            sidecar = claim_file_for(key).with_suffix(".name")
+            if sidecar.exists():
+                try:
+                    label = sidecar.read_text(encoding="utf-8").strip()
+                except OSError:
+                    label = ""
+            if not label:
+                label = key
+    if not label:
+        return None
+    tag = _normalize_tag(f"session:{label}")
+    if not tag:
+        return None
+    return tag, label
+
+
+def cmd_bind(args) -> int:
+    """quest bind <project> <quest> [--session-name X]
+
+    Adds a `session:<name>` tag so this chat session is linked to the quest."""
+    resolved = _bind_label_for_current_session(getattr(args, "session_name", "") or "")
+    if not resolved:
+        print("ERROR: no session identity available — pass --session-name explicitly "
+              "or run inside a `claude` session.",
+              file=sys.stderr)
+        return 2
+    tag, label = resolved
+    data = load()
+    project = get_project(data, args.project_id)
+    quest = find_quest(project, args.quest_id)
+    existing = list(quest.get("tags") or [])
+    if tag in existing:
+        print(f"already bound: {tag}")
+        return 0
+    existing.append(tag)
+    quest["tags"] = existing
+    save(data)
+    print(f"bound: {project['name']} / {quest['name']} <- {tag}")
+    print(f"      (session label: {label})")
+    return render_now()
+
+
+def cmd_unbind(args) -> int:
+    """quest unbind [<project> <quest>]
+
+    With no args: remove the current session's tag from EVERY quest carrying it.
+    With both args: remove only from that one quest."""
+    resolved = _bind_label_for_current_session(getattr(args, "session_name", "") or "")
+    if not resolved:
+        print("ERROR: no session identity available — nothing to unbind.",
+              file=sys.stderr)
+        return 2
+    tag, label = resolved
+    data = load()
+    touched: list[tuple[str, str]] = []
+    if args.project_id and args.quest_id:
+        project = get_project(data, args.project_id)
+        quest = find_quest(project, args.quest_id)
+        tags = quest.get("tags") or []
+        if tag in tags:
+            quest["tags"] = [t for t in tags if t != tag]
+            if not quest["tags"]:
+                del quest["tags"]
+            touched.append((args.project_id, args.quest_id))
+    else:
+        for pid, project in data.get("projects", {}).items():
+            for q in project.get("quests", []) or []:
+                tags = q.get("tags") or []
+                if tag in tags:
+                    q["tags"] = [t for t in tags if t != tag]
+                    if not q["tags"]:
+                        del q["tags"]
+                    touched.append((pid, q.get("id", "?")))
+    if not touched:
+        print(f"no quests carry tag '{tag}' — nothing to do.")
+        return 0
+    save(data)
+    print(f"unbound {tag} from {len(touched)} quest(s):")
+    for pid, qid in touched:
+        print(f"  - {pid}/{qid}")
+    return render_now()
+
+
+def cmd_mine(args) -> int:
+    """quest mine — list every quest tagged with this session's name."""
+    resolved = _bind_label_for_current_session(getattr(args, "session_name", "") or "")
+    if not resolved:
+        print("ERROR: no session identity — bind a quest first or pass --session-name.",
+              file=sys.stderr)
+        return 2
+    tag, label = resolved
+    data = load()
+    hits: list[tuple[str, dict]] = []
+    for pid, project in data.get("projects", {}).items():
+        for q in project.get("quests", []) or []:
+            if tag in (q.get("tags") or []):
+                hits.append((pid, q))
+    if not hits:
+        print(f"no quests bound to '{label}'.")
+        print(f"   Bind one with: quest bind <project> <quest-id> --session-name {label}")
+        return 0
+    print(f"Quests bound to '{label}':")
+    for pid, q in hits:
+        status = q.get("status", "?")
+        pct = int(100 * (q.get("progress") or 0))
+        print(f"  - {pid:8s} #{q.get('n','?'):>2} {q.get('name','?'):40s} "
+              f"[{status:7s} {pct:>3}%]")
+    return 0
+
+
 # ---- argparse setup ----
 
 def build_parser() -> argparse.ArgumentParser:
@@ -801,6 +1096,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--plan", default="")
     s.add_argument("--next", default="")
     s.add_argument("--locked", action="store_true", help="add as locked even if no current exists")
+    s.add_argument("--no-claim", dest="no_claim", action="store_true",
+                   help="don't auto-claim this session for the new quest (default: auto-claim)")
     s.set_defaults(func=cmd_add)
 
     s = sub.add_parser("update", help="Update a quest's fields")
@@ -879,6 +1176,38 @@ def build_parser() -> argparse.ArgumentParser:
         help='text for add|note, or index N for done|undone|rm (nothing for list|edit)',
     )
     s.set_defaults(func=cmd_todo)
+
+    s = sub.add_parser("tag", help="Manage a quest's freeform tags (add/remove/list)")
+    s.add_argument("project_id")
+    s.add_argument("quest_id")
+    s.add_argument("action", choices=["add", "remove", "list"])
+    s.add_argument("values", nargs="*",
+                   help="Tag(s) to add/remove. Comma- or space-separated. "
+                        "Allowed: A-Z a-z 0-9 _ : . / - (max 64 chars).")
+    s.set_defaults(func=cmd_tag)
+
+    s = sub.add_parser("bind",
+                       help="Tag a quest with session:<name> to link THIS chat session to it")
+    s.add_argument("project_id")
+    s.add_argument("quest_id")
+    s.add_argument("--session-name", default="",
+                   help="Session label to use. Defaults to current session's "
+                        ".name sidecar, then to the raw session_key.")
+    s.set_defaults(func=cmd_bind)
+
+    s = sub.add_parser("unbind",
+                       help="Remove THIS session's tag — optionally from a specific quest")
+    s.add_argument("project_id", nargs="?", help="Optional — defaults to ALL quests carrying the tag")
+    s.add_argument("quest_id", nargs="?")
+    s.add_argument("--session-name", default="",
+                   help="Override the session label to unbind.")
+    s.set_defaults(func=cmd_unbind)
+
+    s = sub.add_parser("mine",
+                       help="List every quest tagged with this session's session:<name>")
+    s.add_argument("--session-name", default="",
+                   help="Override the session label to look up.")
+    s.set_defaults(func=cmd_mine)
 
     s = sub.add_parser("claim", help="Bind THIS session to a quest (statusline link)")
     s.add_argument("project_id", nargs="?", help="Project id (auto-detected from cwd if omitted)")
