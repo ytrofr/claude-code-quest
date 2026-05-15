@@ -784,6 +784,16 @@ def cmd_claim(args) -> int:
 
     claim_file_for(key).write_text(f"{project_id}/{quest_id}\n", encoding="utf-8")
 
+    # Lock sidecar: when --lock, write `.lock` next to claim. The prompt-rebind
+    # hook honors this marker and skips auto-rebind. /quest unlock clears it.
+    lock_path = claim_file_for(key).with_suffix(".quest.lock")
+    if getattr(args, "lock", False):
+        lock_path.write_text(f"{project_id}/{quest_id}\n", encoding="utf-8")
+    else:
+        # Clearing claim: drop any stale lock so the next claim isn't sticky.
+        try: lock_path.unlink()
+        except FileNotFoundError: pass
+
     # Sidecar .name file — captures the chosen session name next to the claim.
     # Survives independent of quests.json mutations and supports multiple live
     # sessions on the same quest (each session has its own sidecar).
@@ -878,6 +888,100 @@ def cmd_claimed(args) -> int:
             print(f"claim: {ap}/-  (project home — no current quest)")
         else:
             print("claim: -  (no project resolvable from cwd)")
+    return 0
+
+
+def cmd_unlock(args) -> int:
+    """Remove the lock sidecar for THIS session. Re-enables auto-rebind.
+
+    Does NOT touch the claim file itself — use /quest unclaim to clear that.
+    """
+    key = session_key()
+    if not key:
+        print("ERROR: could not resolve CC session identity", file=sys.stderr)
+        return 2
+    lock_path = claim_file_for(key).with_suffix(".quest.lock")
+    if not lock_path.exists():
+        print("No lock active for this session.")
+        return 0
+    lock_path.unlink()
+    print(f"Unlocked: {lock_path.name} removed. Auto-rebind re-enabled.")
+    return 0
+
+
+def cmd_rebind_stats(args) -> int:
+    """Summarize recent prompt-rebind hook activity from rebind.jsonl.
+
+    Reads ~/.claude/quest/log/rebind.jsonl, filters to the last N days
+    (default 7), reports action distribution, threshold-boundary candidates
+    (near rebind threshold — likely tune targets), and any recent rebinds
+    on THIS session.
+    """
+    log_path = ROOT / "quest" / "log" / "rebind.jsonl"
+    if not log_path.is_file():
+        print("No rebind log yet. Hook has not fired or is disabled.")
+        return 0
+    import time as _t
+    cutoff = _t.time() - (args.days * 86400)
+    entries: list[dict] = []
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except Exception:
+                    continue
+                ts = e.get("ts", "")
+                try:
+                    et = _t.mktime(_t.strptime(ts, "%Y-%m-%dT%H:%M:%SZ"))
+                except Exception:
+                    continue
+                if et >= cutoff:
+                    entries.append(e)
+    except Exception as exc:
+        print(f"ERROR reading log: {exc}", file=sys.stderr)
+        return 2
+    if not entries:
+        print(f"No hook activity in last {args.days} day(s).")
+        return 0
+
+    print(f"=== /quest rebind-stats — last {args.days} day(s) ({len(entries)} fires) ===\n")
+
+    actions: dict[str, int] = {}
+    acteds: dict[str, int] = {}
+    for e in entries:
+        actions[e.get("action", "?")] = actions.get(e.get("action", "?"), 0) + 1
+        acteds[e.get("acted", "?")] = acteds.get(e.get("acted", "?"), 0) + 1
+    print("Action distribution (what the scorer decided):")
+    for a, n in sorted(actions.items(), key=lambda kv: -kv[1]):
+        print(f"  {a:<24} {n}")
+    print("\nActed distribution (what the hook actually did):")
+    for a, n in sorted(acteds.items(), key=lambda kv: -kv[1]):
+        print(f"  {a:<24} {n}")
+
+    # Threshold-tune candidates: rebinds with thin margin OR suggests near rebind threshold
+    print("\nTune candidates (rebinds with margin <4, OR suggests with score >=4.5):")
+    cands = [
+        e for e in entries
+        if (e.get("action") == "rebind" and 0 < e.get("margin", 0) < 4)
+        or (e.get("action") == "suggest" and e.get("score", 0) >= 4.5)
+    ]
+    if not cands:
+        print("  (none — thresholds appear well-calibrated)")
+    else:
+        for e in cands[-15:]:  # most recent 15
+            print(f"  {e['ts']} {e.get('action','?'):<8} top={e.get('top','-')[:35]:<37} "
+                  f"s={e.get('score',0):<5} m={e.get('margin',0):<5} '{e.get('prompt','')[:50]}'")
+
+    # This session's rebinds
+    cur_sk = session_key()
+    if cur_sk:
+        my = [e for e in entries if e.get("sk") == cur_sk and e.get("acted") in ("rebound", "rebound-dryrun")]
+        if my:
+            print(f"\nThis session (sk={cur_sk}) — {len(my)} actual rebind(s):")
+            for e in my[-10:]:
+                print(f"  {e['ts']} → {e.get('top','-')[:50]}  (from: {e.get('from','none')})")
+
     return 0
 
 
@@ -1214,6 +1318,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("quest_id", nargs="?", help="Quest id (auto-detected if omitted)")
     s.add_argument("--session-name", default="",
                    help="Session label to stamp on the quest (e.g. CC --name). Shown on dashboard title when it differs from quest id.")
+    s.add_argument("--lock", action="store_true",
+                   help="Prevent prompt-rebind hook from auto-switching this claim. Use /quest unlock to re-enable.")
     s.set_defaults(func=cmd_claim)
 
     s = sub.add_parser("unclaim", help="Remove THIS session's claim — revert to auto-detect")
@@ -1221,6 +1327,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("claimed", help="Print the current claim for THIS session")
     s.set_defaults(func=cmd_claimed)
+
+    s = sub.add_parser("unlock", help="Remove the lock sidecar — re-enable prompt-rebind auto-switch")
+    s.set_defaults(func=cmd_unlock)
+
+    s = sub.add_parser("rebind-stats",
+                       help="Summarize recent prompt-rebind hook activity (tune candidates, this session's rebinds)")
+    s.add_argument("--days", type=int, default=7, help="Window in days (default 7)")
+    s.set_defaults(func=cmd_rebind_stats)
 
     return p
 

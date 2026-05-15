@@ -54,6 +54,12 @@
     <div class="info-cell">
       <div class="quest-no">Quest {{active.n}} of {{counts.total}}</div>
       <h2 class="quest-title">{{active.display_name}}</h2>
+
+      <!-- Tag chips (editable). Rendered client-side from data-quest-tags on
+           the parent <article>. + tag and 💬 + session buttons mirror the
+           Quest Log behaviour. Posts to /api/tags/{add,remove,bind,unbind}. -->
+      <div class="qd-chips" data-qd-chips></div>
+
       <div class="stat-row">
         <span class="pill type"><span class="qd-status-icon-inline">{{> _status-icon}}</span> {{active.status_pretty}}</span>
         <span class="pill">+{{active.xp_reward}} XP</span>

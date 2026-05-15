@@ -253,8 +253,43 @@ All three failure modes encoded into I1/I2/I3.
 | `/quest bind <project> <quest> [--session-name X]`     | Add `session:<name>` linking THIS chat to a quest. Renders a 💬 ribbon on the card image.          |
 | `/quest unbind [<project> <quest>] [--session-name X]` | Remove THIS session's tag — from one quest, or every quest carrying it.                            |
 | `/quest mine [--session-name X]`                       | List every quest tagged with this session's name.                                                  |
+| `/quest claim [<project> <quest>] [--lock]`            | Bind THIS session to a quest. `--lock` freezes the claim — prompt-rebind hook will not auto-switch. |
+| `/quest unclaim`                                       | Remove this session's claim — revert to auto-detect (clears lock too).                              |
+| `/quest claimed`                                       | Print this session's current claim (or auto-detected fallback).                                    |
+| `/quest unlock`                                        | Remove the lock sidecar only — claim file stays. Re-enables auto-rebind.                            |
+| `/quest rebind-stats [--days N]`                       | Summarize recent prompt-rebind hook activity. Tune candidates + this session's rebinds.            |
 
 After every mutating command, the renderer runs automatically.
+
+## Prompt-Rebind Hook
+
+Every `UserPromptSubmit` fires `~/.claude/hooks/quest-prompt-rebind.sh` which scores your prompt against the project's current quests and rewrites the claim file when the signal is strong. Sources scored: the user prompt itself + the last assistant message text from `transcript_path`. Two-stage IDF logic:
+
+1. **User-alone** — strong prompt (`score ≥ 5, margin ≥ 3`) rebinds immediately.
+2. **Joined fallthrough** — generic "lets do A" prompts get scored together with the prior assistant message; rebind on same threshold.
+3. **Conflict guard** — if user signals a different quest than joined picks, downgrade to `suggest` (no auto-rebind).
+4. **Suggest** — `score ≥ 3` emits `[quest-hint]` to stdout (visible to Claude as additionalContext) without writing the claim.
+
+### Kill switches
+
+- **Per-session lock**: `/quest claim --lock <proj> <qid>` (or `touch ~/.claude/quest/run/session-<sk>.quest.lock`). Hook honors and logs `acted=locked-skip`. Clear with `/quest unlock`.
+- **Global dry-run**: `touch ~/.claude/quest/dry-run` — hook still scores and logs but never writes claim file. `acted=rebound-dryrun`.
+- **Hard disable**: `touch ~/.claude/quest/prompt-rebind-disabled` — hook exits at the bash entry point, no scorer invocation.
+- **Settings.json removal**: delete the `quest-prompt-rebind.sh` entry from `hooks.UserPromptSubmit`.
+
+### Tuning
+
+After ~50 prompts, run `/quest rebind-stats --days 7`. Look for:
+- High `noop` count + low `rebind` → threshold too strict, lower `REBIND_SCORE` in `prompt_rebind_scorer.py`
+- False-positive rebinds (you re-claim manually right after) → threshold too lax, raise `REBIND_MARGIN`
+- Tune candidates list → these are at the edge, decide which way each should go
+
+### Implementation files
+
+- `~/.claude/skills/quest/prompt_rebind_scorer.py` — IDF tokenizer + two-stage decision + atomic claim rewrite
+- `~/.claude/hooks/quest-prompt-rebind.sh` — UserPromptSubmit entry point (~10 lines)
+- `~/.claude/skills/quest/test_prompt_rebind.py` — 28-test regression suite (`python3 -m unittest test_prompt_rebind`)
+- `~/.claude/quest/log/rebind.jsonl` — append-only observability log (read by `/quest rebind-stats`)
 
 ## Tags + Session Binding — UI + CLI + API
 

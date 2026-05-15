@@ -174,7 +174,15 @@
   .qd-task-done .qd-task-mark { background: #5e9a4a; color: #fff; border-color: #2e5a2e; }
   .qd-task-done .qd-task-title { color: #6a7a8a; text-decoration: line-through; }
   .qd-task-todo .qd-task-mark { background: #fffdf2; color: transparent; }
-  .qd-task-title { font-weight: 600; color: #2a3a4a; flex: 1; }
+  .qd-task-title { font-weight: 500; color: #2a3a4a; flex: 1; font-size: 13px; line-height: 1.45; word-break: break-word; overflow-wrap: anywhere; }
+  .qd-task-title strong { font-weight: 700; color: #2a3a4a; }
+  .qd-task-title em { font-style: italic; }
+  .qd-task-title code,
+  .qd-my-notes code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; padding: 1px 5px; background: #fffdf2; border: 1px solid #c0a878; border-radius: 4px; color: #2a3a4a; }
+  .qd-tasks-summary-preview code { font-size: 11px; padding: 0 4px; }
+  /* qd-task list spacing — keep titles compact even when they contain multi-clause prose with code spans */
+  .qd-task { padding: 5px 0; }
+  .qd-task > span { line-height: 1.45; }
   .qd-task-arrow { color: #ff6a3a; font-size: 13px; transition: transform 0.2s ease; opacity: 0.7; }
   .qd-task-details[open] .qd-task-arrow { transform: rotate(90deg); opacity: 1; }
   .qd-task-brief { margin: 6px 0 6px 26px; padding: 10px 12px; background: #f7eed8; border-radius: 8px; border: 2px solid #c0a878; font-size: 13px; }
@@ -217,6 +225,25 @@
     .qd-link-url { grid-column: 1; grid-row: 3; text-align: left; max-width: 100%; }
     .qd-link-desc { grid-column: 1; grid-row: 2; }
   }
+  /* User-authored tag chips on the plan-card (mirrors quest-log chip row) */
+  .qd-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 10px 0 4px; }
+  .qd-chip { display: inline-flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: lowercase; border: 2px solid #2a3a4a; background: #f0e4cc; color: #2a3a4a; line-height: 1.3; cursor: pointer; transition: background 0.1s; text-decoration: none; }
+  .qd-chip:hover { background: #ffd24a; }
+  .qd-chip.session { background: #2a3a4a; color: #ffd24a; border-color: #1a2530; text-transform: none; letter-spacing: 0.2px; }
+  .qd-chip.session:hover { background: #1a2530; color: #ffd24a; }
+  .qd-chip.session::before { content: '💬'; font-size: 11px; }
+  .qd-chip.priority { background: #ff6a3a; color: #fff; border-color: #5a1818; }
+  .qd-chip.priority:hover { background: #e0501a; }
+  .qd-chip .qd-chip-x { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 2px; background: rgba(0,0,0,0.18); color: inherit; border-radius: 50%; font-size: 12px; line-height: 1; cursor: pointer; }
+  .qd-chip .qd-chip-x:hover { background: rgba(255,0,0,0.55); color: #fff; }
+  .qd-chip-add { padding: 3px 10px; background: #fffdf2; border: 2px dashed #2a3a4a; border-radius: 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.4px; color: #5a6a7a; cursor: pointer; line-height: 1.3; }
+  .qd-chip-add:hover { background: #ffd24a; color: #2a3a4a; border-style: solid; }
+  .qd-chip-add-session { border-color: #1a2530; color: #2a3a4a; background: #f0e4cc; }
+  .qd-chip-add-session:hover { background: #2a3a4a; color: #ffd24a; border-color: #1a2530; border-style: solid; }
+  .qd-chip-input { padding: 3px 8px; border: 2px solid #ff6a3a; border-radius: 10px; font-size: 12px; font-family: inherit; font-weight: 600; max-width: 220px; outline: none; }
+  .qd-toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); padding: 8px 16px; background: #2a3a4a; color: #ffd24a; border-radius: 8px; font-size: 13px; font-weight: 700; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100; }
+  .qd-toast.show { opacity: 1; }
+  .qd-toast.error { background: #5a1818; color: #fff; }
   /* Multi-active: ?q=<id> dispatcher hides all blocks but the matching one. */
   .qd-quest-block { display: none; }
   .qd-quest-block.qd-active { display: block; }
@@ -460,6 +487,179 @@
         alert('Copy unavailable. Text:\n\n' + text);
       }
     });
+  });
+})();
+
+/* ============================================================
+   Tag chips: add/remove tags from THIS quest via /api/tags/*.
+   Mirrors quest-log.html.tmpl chip JS but targets the per-block
+   `<article class="qd-quest-block" data-project-id="..." data-quest-id="..."
+   data-quest-tags="...">` wrapper. Only one block is `qd-active` at a time;
+   the JS still wires every block (cheap, future-proof when the picker switches).
+============================================================ */
+(function() {
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function chipClass(t) {
+    if (t.indexOf('session:') === 0)  return 'qd-chip session';
+    if (t.indexOf('priority:') === 0) return 'qd-chip priority';
+    return 'qd-chip';
+  }
+  function chipLabel(t) {
+    return t.indexOf('session:') === 0 ? t.slice(8) : t;
+  }
+  function showToast(msg, isErr) {
+    var toast = document.getElementById('qd-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'qd-toast';
+      toast.className = 'qd-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.className = 'qd-toast show' + (isErr ? ' error' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function() { toast.className = 'qd-toast' + (isErr ? ' error' : ''); }, 2200);
+  }
+  function apiCall(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function(r) { return r.json(); })
+      .catch(function() { return { ok: false, msg: 'Network error' }; });
+  }
+
+  function renderChips(article) {
+    var slot = article.querySelector('[data-qd-chips]');
+    if (!slot) return;
+    var raw = (article.dataset.questTags || '').trim();
+    var tags = raw ? raw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+    var proj = article.dataset.projectId || '';
+    var html = tags.map(function(t) {
+      var cls = chipClass(t);
+      // Chip body links to quest-log filtered by this tag (nice side benefit
+      // — keeps tag-as-filter affordance from the Quest Log view).
+      var href = 'quest-log.html?q=' + encodeURIComponent(t);
+      return '<a class="' + cls + '" href="' + esc(href) + '" data-tag="' + esc(t) + '" title="Click to view Quest Log filtered by this tag; ✕ to remove">'
+           +   esc(chipLabel(t))
+           +   '<span class="qd-chip-x" data-remove="' + esc(t) + '" title="Remove tag">×</span>'
+           + '</a>';
+    }).join('');
+    html += '<button type="button" class="qd-chip-add" data-add-tag title="Add a freeform tag (priority:p0, audit, area/auth, etc.)">+ tag</button>';
+    html += '<button type="button" class="qd-chip-add qd-chip-add-session" data-bind-session title="Bind to a chat conversation — auto-prefixed session:">💬 + session</button>';
+    slot.innerHTML = html;
+  }
+
+  // Initial render for every article (visible + hidden)
+  document.querySelectorAll('article.qd-quest-block[data-quest-id]').forEach(renderChips);
+
+  document.addEventListener('click', function(e) {
+    var article = e.target.closest('article.qd-quest-block[data-quest-id]');
+    if (!article) return;
+    var proj = article.dataset.projectId || '';
+    var qid = article.dataset.questId || '';
+
+    // Remove tag (× button)
+    var removeBtn = e.target.closest('[data-remove]');
+    if (removeBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var removedTag = removeBtn.dataset.remove;
+      apiCall('/api/tags/remove', { project: proj, id: qid, tag: removedTag }).then(function(res) {
+        if (res.ok) {
+          article.dataset.questTags = (res.tags || []).join(',');
+          renderChips(article);
+          if (removedTag.indexOf('session:') === 0) {
+            showToast('Removed: ' + removedTag + ' — refreshing…');
+            setTimeout(function() { location.reload(); }, 700);
+          } else {
+            showToast('Removed: ' + removedTag);
+          }
+        } else {
+          showToast(res.msg || 'Failed', true);
+        }
+      });
+      return;
+    }
+
+    // Bind to a conversation (+ session button) — auto-prefixes session:
+    var bindBtn = e.target.closest('[data-bind-session]');
+    if (bindBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var sInput = document.createElement('input');
+      sInput.type = 'text';
+      sInput.className = 'qd-chip-input';
+      sInput.placeholder = 'conversation name…';
+      sInput.maxLength = 64;
+      bindBtn.replaceWith(sInput);
+      sInput.focus();
+      var done = false;
+      var sCommit = function() {
+        if (done) return; done = true;
+        var val = (sInput.value || '').trim();
+        if (!val) { renderChips(article); return; }
+        apiCall('/api/tags/bind', { project: proj, id: qid, name: val }).then(function(res) {
+          if (res.ok) {
+            article.dataset.questTags = (res.tags || []).join(',');
+            renderChips(article);
+            showToast('Bound to: ' + val + ' — refreshing…');
+            setTimeout(function() { location.reload(); }, 700);
+          } else {
+            showToast(res.msg || 'Failed', true);
+            renderChips(article);
+          }
+        });
+      };
+      sInput.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); sCommit(); }
+        else if (ev.key === 'Escape') { done = true; renderChips(article); }
+      });
+      sInput.addEventListener('blur', sCommit);
+      return;
+    }
+
+    // Add tag (+ tag button)
+    var addBtn = e.target.closest('[data-add-tag]');
+    if (addBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'qd-chip-input';
+      input.placeholder = 'tag,tag2…';
+      input.maxLength = 200;
+      addBtn.replaceWith(input);
+      input.focus();
+      var done = false;
+      var commit = function() {
+        if (done) return; done = true;
+        var val = (input.value || '').trim();
+        if (!val) { renderChips(article); return; }
+        apiCall('/api/tags/add', { project: proj, id: qid, tag: val }).then(function(res) {
+          if (res.ok) {
+            article.dataset.questTags = (res.tags || []).join(',');
+            renderChips(article);
+            if (val.indexOf('session:') !== -1) {
+              showToast('Tagged: ' + val + ' — refreshing…');
+              setTimeout(function() { location.reload(); }, 700);
+            } else {
+              showToast('Tagged: ' + val);
+            }
+          } else {
+            showToast(res.msg || 'Failed', true);
+            renderChips(article);
+          }
+        });
+      };
+      input.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        else if (ev.key === 'Escape') { done = true; renderChips(article); }
+      });
+      input.addEventListener('blur', commit);
+      return;
+    }
   });
 })();
 </script>
