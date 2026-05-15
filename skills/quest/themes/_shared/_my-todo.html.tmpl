@@ -6,6 +6,7 @@
        my_todo_done / my_todo_total (int) — counts
        my_todo_next  (str)   — first not-done title (preview)
        my_notes_html (str)   — rendered notes HTML (raw-injected)
+       my_todo_editor_href (str) — vscode://file/<abs> deeplink to sidecar
 
      The section ALWAYS renders — content when my_todo_has, an empty-state hint
      otherwise. Open by default (it is the user's own space), but still a
@@ -20,6 +21,10 @@
       <h3 class="qd-tasks-title">My To-Do</h3>
       <span class="qd-tasks-count">{{my_todo_done}} / {{my_todo_total}}</span>
       {{#if my_todo_next}}<span class="qd-tasks-summary-preview">Next: {{my_todo_next}}</span>{{/if}}
+      {{#if my_todo_editor_href}}
+      <a class="qd-my-todo-edit" href="{{my_todo_editor_href}}" title="Open sidecar in VS Code / Cursor / Windsurf"
+         onclick="event.stopPropagation();">✎ Edit in editor</a>
+      {{/if}}
     </summary>
     {{#if my_todo_total}}
     <ul class="qd-tasks-list">
@@ -46,6 +51,9 @@
     <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
     <h3 class="qd-tasks-title">My To-Do</h3>
     <span class="qd-actions-empty-badge">none yet</span>
+    {{#if my_todo_editor_href}}
+    <a class="qd-my-todo-edit" href="{{my_todo_editor_href}}" title="Create &amp; open sidecar in VS Code / Cursor">✎ Open in editor</a>
+    {{/if}}
   </div>
   <p class="qd-actions-empty-hint">Your space — jot tasks &amp; notes for this quest. Add one with <code>/quest todo add &lt;proj&gt; &lt;quest&gt; "..."</code>, or open the file with <code>/quest todo edit &lt;proj&gt; &lt;quest&gt;</code>.</p>
 </section>

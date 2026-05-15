@@ -1,17 +1,19 @@
 [Unit]
-Description=Quest Dashboard — static HTML server for ~/.claude/quest/site
+Description=Quest Dashboard — static HTML + tag-mutation API server
 Documentation=https://github.com/ytrofr/claude-code-quest
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -m http.server 8770 --directory %h/.claude/quest/site --bind 127.0.0.1
+Environment=QUEST_HOST=127.0.0.1
+Environment=QUEST_PORT=8770
+# server.py: serves static site/, plus POST /api/tags/{add,remove,bind,unbind}
+# for UI tag mutations. Renders on startup + after every mutation.
+ExecStart=/usr/bin/python3 %h/.claude/skills/quest/server.py
 Restart=on-failure
 RestartSec=5s
-# Re-render before starting in case data changed since last render (best-effort, non-blocking)
-ExecStartPre=-/usr/bin/python3 %h/.claude/skills/quest/render.py
 
-# Hardening — port-bound to localhost only via --bind 127.0.0.1 above
+# Hardening — port-bound to localhost only via QUEST_HOST above
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

@@ -2,6 +2,37 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] — 2026-05-15
+
+Freeform `tags[]` per quest, in-page search, session ribbon on the card image, "Open in editor" deeplink for My To-Do sidecars, and a small JSON API replacing the bare static server.
+
+### Added
+
+- **Freeform tags per quest.** New optional `tags[]` field on every quest in `quests.json`. Manage from three surfaces:
+  - **UI chip row** under each quest card. `+ tag` opens an inline input (accepts comma-separated values). `×` on any chip removes. Click a chip body to filter the list by that tag.
+  - **`💬 + session` button.** Cleaner entry for binding a quest to a chat conversation — type just the conversation name, the prefix `session:` is added automatically. Page reloads so the new `.illus` ribbon appears.
+  - **CLI**: `quest tag <project> <quest> add foo,bar`, `quest tag … remove foo`, `quest tag … list`, `quest bind <project> <quest> [--session-name X]`, `quest unbind`, `quest mine`.
+- **Session ribbon on the quest card.** Tags starting with `session:` render as a prominent dark pill (💬-prefixed) inside the `.illus` SVG below the status badge, with a soft red pulse on `current` quests — designed so "what's THIS chat working on" is visible at a glance. Multiple session tags stack vertically.
+- **Live search bar.** Always-visible search at the top of every Quest Log page. Filters cards by name / desc / tags / id / status simultaneously. Debounced; persists in `?q=` for shareable URLs. `Esc` or `✕` clears.
+- **`✎ Edit in editor` link on every My To-Do block** — emits a `vscode://file/<absolute-sidecar-path>` deeplink. Works with VS Code, Cursor, Windsurf. Available for both populated and empty-state sidecars.
+- **JSON API for tag mutations.** New `skills/quest/server.py` replaces `python3 -m http.server`. Still binds to `127.0.0.1` only.
+  - `POST /api/tags/add` `{project, id, tag}` — `tag` accepts a comma list
+  - `POST /api/tags/remove` `{project, id, tag}`
+  - `POST /api/tags/bind` `{project, id, name?}` — auto-prefixes `session:`
+  - `POST /api/tags/unbind` `{project, id}`
+  - `GET /api/session` — diagnostic
+  - Single writer lock, atomic JSON write, in-process re-render after each mutation.
+
+### Changed
+
+- **`systemd/quest-dashboard.service` updated** to run `server.py` instead of `python3 -m http.server`. Same port, same localhost binding, same hardening flags.
+- **Render layer**: `tags_str` / `tags_pretty` / `session_tags_html` now always default to empty string. Previously, quests with no `tags` field rendered the literal `{{q.tags_str}}` marker (the engine intentionally leaves missing fields visible as a debug aid — but `tags` is an optional field that should render quietly when absent).
+
+### Internal
+
+- `session_tags_html` is pre-rendered Python-side and injected via `{{{...}}}` triple-brace raw inject. The template engine's non-greedy `{{#each}}` regex doesn't support nested loops — same trick already used by `live_claims_html`.
+- Single shared tag validator: `^[A-Za-z0-9_:./\-]{1,64}$`. Colon allows `session:limor:s2`; dot allows `v1.2`; slash allows `area/auth`.
+
 ## [1.8.0] — 2026-05-14
 
 User-authored "My To-Do" sidecar + fenced-code diagram blocks.
