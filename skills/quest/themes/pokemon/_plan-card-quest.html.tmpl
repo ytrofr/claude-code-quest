@@ -53,7 +53,18 @@
 
     <div class="info-cell">
       <div class="quest-no">Quest {{active.n}} of {{counts.total}}</div>
-      <h2 class="quest-title">{{active.display_name}}</h2>
+      <div class="quest-title-row" style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <h2 class="quest-title qd-quest-title-display" style="flex:1;margin:0;">{{active.display_name}}</h2>
+        <button class="qd-rename-btn" type="button" onclick="qdStartRename(this)" title="Rename quest" style="background:transparent;border:1.5px solid #c9a020;color:#c9a020;border-radius:6px;padding:4px 10px;font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;cursor:pointer;align-self:center;">✏ Rename</button>
+      </div>
+      <div class="qd-rename-edit" style="display:none;width:100%;margin-bottom:10px;">
+        <input class="qd-rename-input" type="text" maxlength="200" style="width:100%;padding:8px 10px;font-family:'Fredoka',sans-serif;font-size:18px;font-weight:700;border:2px solid #2a3a4a;border-radius:6px;background:#fff;color:#2a3a4a;box-sizing:border-box;"/>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button type="button" onclick="qdCommitRename(this)" style="flex:1;padding:6px;background:#5e9a4a;color:#fff;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+          <button type="button" onclick="qdCancelRename(this)" style="flex:1;padding:6px;background:#fff;color:#2a3a4a;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Cancel</button>
+        </div>
+        <div class="qd-rename-err" style="margin-top:6px;color:#c44545;font-size:11px;display:none;"></div>
+      </div>
 
       <!-- Tag chips (editable). Rendered client-side from data-quest-tags on
            the parent <article>. + tag and 💬 + session buttons mirror the

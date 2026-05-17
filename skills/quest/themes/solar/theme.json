@@ -1,0 +1,42 @@
+{
+  "name": "solar",
+  "version": 0,
+  "status": "PREVIEW — not wired into render.py yet. Pick this theme via the hub before adoption.",
+  "description": "Cartoon kawaii solar systems. Each cluster of quests = a solar system with cartoon-faced sun (cluster lead) + planets (member quests). Black hole at center = long-term mission. Cream background, dark outlines, Fredoka font. Status by color (pink=current, gold=in-progress, teal=done, gray=planned).",
+  "font": "Fredoka",
+  "landmarks": ["sun", "planet", "moon", "blackhole", "comet", "nebula"],
+  "preview_url": "/mocks/ogas-real-solar.html",
+  "cosmic_vocab": {
+    "blackhole": "long-term project goal",
+    "solar_system": "cluster of related quests (by tag/domain)",
+    "sun": "cluster lead / main quest of the cluster",
+    "planet": "individual quest within the cluster",
+    "moon": "sub-quest of a quest (optional)",
+    "comet": "future / planned quest sweeping in",
+    "nebula": "shared area between two clusters (overlap)"
+  },
+  "clustering": {
+    "strategy": "tag-or-domain — group quests by primary tag; fall back to keyword match on name",
+    "max_clusters_visible": 6,
+    "max_planets_per_cluster": 6,
+    "overflow_strategy": "show top-N by progress, render '+N more' chip"
+  },
+  "status_palette": {
+    "current": "#ff6a8a",
+    "in_progress": "#ffd24a",
+    "done": "#9bd0c8",
+    "locked": "#d8d8e0",
+    "blackhole": "#0a0a14 + #ffd24a accretion"
+  },
+  "positions": {
+    "_comment": "Positions are dynamic in this theme — clusters arranged radially around the central BH. See render strategy in route.html.tmpl when wired."
+  },
+  "wiring_steps_when_adopted": [
+    "1. Copy mocks/ogas-real-solar.html structure into themes/solar/route.html.tmpl with Jinja-style placeholders",
+    "2. Add cluster-detection logic to render.py (group_quests_by_tag or _by_domain)",
+    "3. Add theme registration to themes/_shared/README.md theme registry",
+    "4. Test render on OGAS first (preview at /ogas/route.html with theme=solar)",
+    "5. Bump version to 1, remove status:PREVIEW field",
+    "6. Document in MEMORY.md + quest-dashboard.md rule"
+  ]
+}

@@ -2,6 +2,35 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] — 2026-05-17
+
+In-card theme switching (default + cartoon solar systems + Pokemon worldmap), quest title rename across all three views, URL-paste auto-rebind hook.
+
+### Added
+
+- **Two new alt themes — Solar Cartoon + Pokemon Worldmap.** Solar renders quest clusters as cartoon solar systems (sun = cluster lead, planets = members, black hole = long-term goal). Worldmap renders quest clusters as fenced regions on a multi-biome Pokemon overworld (city = cluster lead, towns = members, castle = goal). Tag-based clustering with name-keyword fallback; capped at 4 clusters × 8 planets/towns; spillover bucket "✨ Other Active". Both auto-rendered for every project at `<proj>/route-solar.html` and `<proj>/route-worldmap.html`.
+- **In-card theme tabs** (opt-in per project via `alt_themes_in_card: true` flag in `quests.json`). Tabs `📍 Default · 🌌 Solar · 🗺 Worldmap` sit in the top-right of the map card. Clicking a tab lazy-fetches the alt route, extracts its SVG, and swaps it inside the card. Chrome (header, MAP / QUEST LOG nav, XP bar, legend, footer current-quest detail) stays put across all three themes.
+- **Quest title rename — 3 surfaces.** ✏ button on every quest title across:
+  - **Map view modal** — click any quest pin / planet / town → modal opens with name / status / tags / progress / "Open quest card →" / ✏ Rename.
+  - **Plan-card detail page** — ✏ button next to the `<h2>` quest title.
+  - **Quest log card** — ✏ reveals on card hover next to each title, click stops event propagation so it doesn't navigate.
+- **`POST /api/quest/rename`** server endpoint. Body `{project, id, name}` → atomic write to `quests.json` (validated: empty / >200 chars rejected, unknown id 404'd) + re-render of all themes. Autosync never touches `quest["name"]` so renames persist across plan rewrites and `/quest <op>` cascades. Enter commits, Esc cancels.
+- **`POST /api/quest/rename` keyboard affordances** in every rename input: Enter saves, Esc cancels.
+- **Modular alt-theme renderer** at `skills/quest/themes/alt_render.py` — standalone Python (no deps). CLI: `python3 alt_render.py [--project=X] [--theme=solar|worldmap|all] [--post-inject]`. Idempotent. Invoked automatically by `render.py::render_all()` via a lazy-import hook so any plan write / `/quest <op>` cascade refreshes all themes in one shot.
+- **Theme scaffolds**: `themes/solar/theme.json` + `themes/worldmap/theme.json` document cosmic vocab (sun / planet / moon / BH / comet / nebula), RPG vocab (city / town / castle / region / biome hints), clustering strategy, status palette, and adoption steps.
+- **Quest pin hover affordance**: default theme `.qm` now has `cursor: pointer` + hover drop-shadow + brightness. Previously pins were technically clickable but had no visual cue.
+- **Click delegate for default-theme pins**: clicking any `[data-quest]` in the default SVG opens the same modal used by solar / worldmap. Quest data indexed client-side from a new `quests_json_blob` field in the precompute scope.
+- **URL-paste auto-rebind hook** at `hooks/quest-url-rebind.sh` (UserPromptSubmit). When the operator pastes `localhost:8770/<proj>/plan-card.html?q=<qid>` in chat, the hook hard-claims the quest for the session via the canonical `quest.py claim` CLI, writes a 60s URL-lock sentinel (prompt-rebind scorer reads it and short-circuits to prevent IDF token overlap from silently undoing the paste), and writes a 5min canary-suppression sentinel (statusline drops the ⚠ drift glyph since the mismatch is intentional). Also emits additionalContext directing Claude to Read the plan file first. Kill switches: `QUEST_URL_AUTOCLAIM_DISABLED=1` env var, or `touch ~/.claude/quest/url-autoclaim-disabled`.
+
+### Changed
+
+- **`render.py::precompute()`** now adds `project["quests_json_blob"]` — compact JSON `[{id, name, n, status, progress, tags}, …]` for client-side quest lookup in the in-card-tabs JS.
+- **`render.py::render_all()`** appends a lazy-import block calling `themes/alt_render.py` so every default render is followed by solar + worldmap renders. Wrapped in `try/except` — failure of the alt-theme step cannot break the default render.
+
+### Internal
+
+- **`prompt_rebind_scorer.py`** — URL-lock sentinel check at top of `score_and_decide()`. If `session-<sk>.url-locked` exists and not expired, scorer logs `acted="skipped_url_locked"` and returns immediately. Prevents IDF token overlap from competing with the hard-rebound claim in the same turn.
+
 ## [1.10.0] — 2026-05-15
 
 Prompt-driven quest claim auto-rebind, tag editing on the plan-card detail page, inline markdown in the My To-Do list, WSL2-aware editor deeplinks.

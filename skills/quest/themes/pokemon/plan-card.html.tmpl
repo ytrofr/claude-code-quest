@@ -662,6 +662,88 @@
     }
   });
 })();
+
+// ============ Quest title rename (in plan-card) ============
+(function() {
+  function getArticleAndIds(buttonEl) {
+    var article = buttonEl.closest('article.qd-quest-block');
+    if (!article) return null;
+    return {
+      article: article,
+      project: article.dataset.projectId || '',
+      qid: article.dataset.questId || '',
+      titleEl: article.querySelector('.qd-quest-title-display'),
+      editEl: article.querySelector('.qd-rename-edit'),
+      btnEl: article.querySelector('.qd-rename-btn'),
+      inputEl: article.querySelector('.qd-rename-input'),
+      errEl: article.querySelector('.qd-rename-err'),
+    };
+  }
+  window.qdStartRename = function(btn) {
+    var ctx = getArticleAndIds(btn);
+    if (!ctx) return;
+    ctx.inputEl.value = ctx.titleEl.textContent.trim();
+    ctx.editEl.style.display = 'block';
+    ctx.btnEl.style.display = 'none';
+    ctx.titleEl.style.display = 'none';
+    ctx.errEl.style.display = 'none';
+    ctx.inputEl.focus();
+    ctx.inputEl.select();
+  };
+  window.qdCancelRename = function(btn) {
+    var ctx = getArticleAndIds(btn);
+    if (!ctx) return;
+    ctx.editEl.style.display = 'none';
+    ctx.btnEl.style.display = '';
+    ctx.titleEl.style.display = '';
+    ctx.errEl.style.display = 'none';
+  };
+  window.qdCommitRename = function(btn) {
+    var ctx = getArticleAndIds(btn);
+    if (!ctx) return;
+    var newName = (ctx.inputEl.value || '').trim();
+    if (!newName) {
+      ctx.errEl.textContent = 'Name cannot be empty';
+      ctx.errEl.style.display = 'block';
+      return;
+    }
+    if (!ctx.project || !ctx.qid) {
+      ctx.errEl.textContent = 'Could not detect project/quest from article';
+      ctx.errEl.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    fetch('/api/quest/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: ctx.project, id: ctx.qid, name: newName }),
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.j.ok) throw new Error(res.j.error || res.j.msg || 'HTTP error');
+        ctx.titleEl.textContent = newName;
+        ctx.errEl.style.display = 'none';
+        ctx.editEl.style.display = 'none';
+        ctx.btnEl.style.display = '';
+        ctx.titleEl.style.display = '';
+        setTimeout(function() { window.location.reload(); }, 600);
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        ctx.errEl.textContent = 'Rename failed: ' + e.message;
+        ctx.errEl.style.display = 'block';
+      });
+  };
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('qd-rename-input')) {
+      e.preventDefault();
+      var btn = e.target.closest('.qd-rename-edit').querySelector('button');
+      if (btn) qdCommitRename(btn);
+    } else if (e.key === 'Escape' && e.target && e.target.classList && e.target.classList.contains('qd-rename-input')) {
+      var cancel = e.target.closest('.qd-rename-edit').querySelectorAll('button')[1];
+      if (cancel) qdCancelRename(cancel);
+    }
+  });
+})();
 </script>
 </body>
 </html>

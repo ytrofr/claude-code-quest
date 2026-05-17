@@ -189,7 +189,18 @@
         {{/if}}
       </div>
       <div class="body">
-        <h3 class="qname">{{q.name}}</h3>
+        <div class="qname-row" style="display:flex;align-items:flex-start;gap:6px;">
+          <h3 class="qname qd-qname-display" style="flex:1;margin:0;">{{q.name}}</h3>
+          <button class="qd-rename-btn" type="button" onclick="qlStartRename(event, this)" title="Rename quest" style="background:transparent;border:1.5px solid #c9a020;color:#c9a020;border-radius:5px;padding:1px 7px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:700;cursor:pointer;flex:none;align-self:flex-start;opacity:0;transition:opacity 0.12s;">✏</button>
+        </div>
+        <div class="qd-rename-edit" style="display:none;margin-bottom:6px;" onclick="event.stopPropagation()">
+          <input class="qd-rename-input" type="text" maxlength="200" onclick="event.stopPropagation()" style="width:100%;padding:6px 8px;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:700;border:2px solid #2a3a4a;border-radius:5px;background:#fff;color:#2a3a4a;box-sizing:border-box;"/>
+          <div style="display:flex;gap:5px;margin-top:5px;">
+            <button type="button" onclick="qlCommitRename(event, this)" style="flex:1;padding:4px;background:#5e9a4a;color:#fff;border:2px solid #2a3a4a;border-radius:5px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Save</button>
+            <button type="button" onclick="qlCancelRename(event, this)" style="flex:1;padding:4px;background:#fff;color:#2a3a4a;border:2px solid #2a3a4a;border-radius:5px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Cancel</button>
+          </div>
+          <div class="qd-rename-err" style="margin-top:4px;color:#c44545;font-size:10px;display:none;"></div>
+        </div>
         <p class="qdesc">{{q.desc}}</p>
         <!-- User-authored tag chips. JS renders from data-quest-tags on the
              card so add/remove can update DOM without a full reload. -->
@@ -528,6 +539,116 @@
     var initial = new URL(location.href).searchParams.get('q') || '';
     if (initial) { input.value = initial; run(); }
   } catch (e) {}
+})();
+
+// ============ Quest title rename (in quest-log card) ============
+(function() {
+  // Reveal ✏ on card hover (inline opacity:0 base; we toggle on hover via JS to
+  // avoid cross-card CSS surgery).
+  document.querySelectorAll('a.card').forEach(function(card) {
+    var btn = card.querySelector('.qd-rename-btn');
+    if (!btn) return;
+    card.addEventListener('mouseenter', function() { btn.style.opacity = '1'; });
+    card.addEventListener('mouseleave', function() {
+      var edit = card.querySelector('.qd-rename-edit');
+      if (!edit || edit.style.display === 'none') btn.style.opacity = '0';
+    });
+  });
+
+  function ctx(buttonEl) {
+    var card = buttonEl.closest('a.card');
+    if (!card) return null;
+    return {
+      card: card,
+      project: card.dataset.projectId || '',
+      qid: card.dataset.questId || '',
+      titleEl: card.querySelector('.qd-qname-display'),
+      editEl: card.querySelector('.qd-rename-edit'),
+      btnEl: card.querySelector('.qd-rename-btn'),
+      inputEl: card.querySelector('.qd-rename-input'),
+      errEl: card.querySelector('.qd-rename-err'),
+    };
+  }
+
+  window.qlStartRename = function(ev, btn) {
+    ev.preventDefault();   // suppress <a> navigation
+    ev.stopPropagation();
+    var c = ctx(btn);
+    if (!c) return;
+    c.inputEl.value = c.titleEl.textContent.trim();
+    c.editEl.style.display = 'block';
+    c.titleEl.style.display = 'none';
+    c.btnEl.style.opacity = '0';
+    c.btnEl.style.pointerEvents = 'none';
+    c.errEl.style.display = 'none';
+    setTimeout(function() { c.inputEl.focus(); c.inputEl.select(); }, 30);
+  };
+
+  window.qlCancelRename = function(ev, btn) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    var c = ctx(btn);
+    if (!c) return;
+    c.editEl.style.display = 'none';
+    c.titleEl.style.display = '';
+    c.btnEl.style.opacity = '1';
+    c.btnEl.style.pointerEvents = '';
+    c.errEl.style.display = 'none';
+  };
+
+  window.qlCommitRename = function(ev, btn) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    var c = ctx(btn);
+    if (!c) return;
+    var newName = (c.inputEl.value || '').trim();
+    if (!newName) {
+      c.errEl.textContent = 'Name cannot be empty';
+      c.errEl.style.display = 'block';
+      return;
+    }
+    if (!c.project || !c.qid) {
+      c.errEl.textContent = 'Could not detect project/quest';
+      c.errEl.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    fetch('/api/quest/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: c.project, id: c.qid, name: newName }),
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.j.ok) throw new Error(res.j.error || res.j.msg || 'HTTP error');
+        c.titleEl.textContent = newName;
+        c.card.dataset.questName = newName;
+        c.editEl.style.display = 'none';
+        c.titleEl.style.display = '';
+        c.btnEl.style.opacity = '1';
+        c.btnEl.style.pointerEvents = '';
+        c.errEl.style.display = 'none';
+        setTimeout(function() { window.location.reload(); }, 600);
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        c.errEl.textContent = 'Rename failed: ' + e.message;
+        c.errEl.style.display = 'block';
+      });
+  };
+
+  // Enter commits, Esc cancels inside the rename input
+  document.addEventListener('keydown', function(e) {
+    if (!e.target || !e.target.classList || !e.target.classList.contains('qd-rename-input')) return;
+    var edit = e.target.closest('.qd-rename-edit');
+    if (!edit) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var saveBtn = edit.querySelectorAll('button')[0];
+      if (saveBtn) qlCommitRename(e, saveBtn);
+    } else if (e.key === 'Escape') {
+      var cancelBtn = edit.querySelectorAll('button')[1];
+      if (cancelBtn) qlCancelRename(e, cancelBtn);
+    }
+  });
 })();
 </script>
 </body>

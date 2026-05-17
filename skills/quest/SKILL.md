@@ -106,6 +106,15 @@ Stub quests (`/quest add <proj> "<name>" --next "..."` and nothing else) are FOR
 
 **When the operator pastes** `http://localhost:8770/<proj>/plan-card.html?q=<qid>` in any session (including fresh sessions with no prior context), execute this routine WITHOUT asking. It is READ-ONLY — no permission needed (does NOT touch Safety Invariant I1).
 
+### Hook enforcement (post-2026-05-15)
+
+The claim step is now **hook-enforced** via `~/.claude/hooks/quest-url-rebind.sh` (UserPromptSubmit). When the URL appears in a prompt, the hook automatically invokes `python3 ~/.claude/skills/quest/quest.py claim <proj> <qid>` BEFORE the model sees the turn, and writes two sentinels under `~/.claude/quest/run/`:
+
+- `session-<sk>.url-locked` (60s) — `prompt_rebind_scorer.py` reads this and short-circuits, preventing IDF token overlap from silently undoing the URL claim in the same turn
+- `session-<sk>.canary-suppressed-until` (5min) — `statusline-quest.sh` reads this and skips the `⚠` drift glyph since the mismatch is INTENTIONAL post-rebind
+
+The hook also emits additionalContext directing the model that the FIRST tool call MUST be `Read <quest.plan>`. **Model still runs Steps 2-7 below** for the summary + probes + confirmation; the hook just guarantees Step 1's claim side-effect happened regardless of model attention. Kill switches: `QUEST_URL_AUTOCLAIM_DISABLED=1` or `touch ~/.claude/quest/url-autoclaim-disabled`. Recurrence-prevention rule: `~/.claude/projects/-home-ytr/memory/feedback_quest_reclaim_on_topic_shift_2026-05-15.md`.
+
 ### Step-by-step
 
 1. **Parse**: extract `<proj>` and `<qid>` via regex `localhost:8770/([a-z][a-z0-9_-]*)/plan-card\.html\?q=([a-z0-9_-]+)`.

@@ -1,0 +1,52 @@
+{
+  "name": "worldmap",
+  "version": 0,
+  "status": "PREVIEW — not wired into render.py yet. Pick this theme via the hub before adoption.",
+  "description": "Pokemon-style top-down world map. Quest clusters = fenced regions on a varied landscape (grass, water, mountains, forest, beach). Cities = cluster lead quests. Towns = member quests. Castle at center = long-term mission. Cream background, dark outlines, Fredoka font, bobbing trainer at current position.",
+  "font": "Fredoka",
+  "landmarks": ["city", "town", "castle", "house", "tower", "bridge", "cave", "forest", "lake", "mountain"],
+  "preview_url": "/mocks/ogas-real-worldmap.html",
+  "rpg_vocab": {
+    "castle": "long-term project goal (central, with flag + crown)",
+    "region": "cluster of related quests (fenced area with regional label)",
+    "city": "cluster lead / main quest of the region (large red roof + chimney)",
+    "town": "individual quest in the region (small roof + colored gable)",
+    "trainer": "you, at the current most-active quest (bobbing pawn)",
+    "tall_grass": "sub-quest / mini-quest (optional)"
+  },
+  "regions": {
+    "strategy": "tag-or-domain clustering, like solar; one region per cluster, region biome chosen by cluster theme",
+    "biome_hints": {
+      "layout-editor": "city district (mountain backdrop)",
+      "web-generation": "plateau / sandy region",
+      "visual-qa": "forest",
+      "plan-quest-tooling": "lakeside",
+      "scoring": "lab + forest",
+      "_default": "grass field"
+    },
+    "max_regions_visible": 4,
+    "max_towns_per_region": 6,
+    "overflow_strategy": "spillover region or '+N backlog' badge"
+  },
+  "status_palette": {
+    "current_city_roof": "#c44545",
+    "current_town_gable": "#3a78d0|#d63a3a|#5a8a3a",
+    "in_progress_label_bg": "#ffd24a",
+    "done_check_badge": "#5e9a4a",
+    "locked": "#aaaaaa with dashed strokes",
+    "castle": "#7a5a9a + ffd24a flag"
+  },
+  "positions": {
+    "_comment": "Regions are anchored at corners + center castle. Towns inside each region are auto-flowed."
+  },
+  "evolution_from": "themes/pokemon — same design tokens (Fredoka, ink #2a3a4a, gold #ffd24a, grass #8fc97a, sand #e8c878), but multi-region instead of linear path. Replaces the single-route layout that proved messy at 70 quests.",
+  "wiring_steps_when_adopted": [
+    "1. Copy mocks/ogas-real-worldmap.html structure into themes/worldmap/route.html.tmpl with Jinja-style placeholders",
+    "2. Add region-detection logic to render.py (group_quests_by_tag, assign biome by tag-rule)",
+    "3. Add theme registration to themes/_shared/README.md theme registry",
+    "4. Test render on OGAS first (preview at /ogas/route.html with theme=worldmap)",
+    "5. Either replace `pokemon` for OGAS or ship as new option alongside",
+    "6. Bump version to 1, remove status:PREVIEW field",
+    "7. Document in MEMORY.md + quest-dashboard.md rule"
+  ]
+}
