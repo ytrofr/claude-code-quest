@@ -39,6 +39,8 @@
   .progress-pill .fill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); }
   .progress-pill .pct { font-weight: 700; font-size: 15px; color: #2a3a4a; }
   /* Quest marker status visibility */
+  .qm { cursor: pointer; }
+  .qm:hover { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) brightness(1.05); }
   .qm-locked { opacity: 0.62; }
   .badge-done, .badge-current, .trainer { display: none; }
   .qm-done .badge-done { display: block; }
@@ -57,6 +59,39 @@
   .qd-chapter-pill { padding: 3px 10px; background: #fff; border: 2px solid #6a4828; border-radius: 10px; font-weight: 600; font-size: 12px; color: #4a3010; }
   .qd-dep-blocked { padding: 6px 12px; margin-top: 8px; background: #f7eed8; border: 2px dashed #c0a878; border-radius: 8px; font-size: 12px; color: #6a4828; font-weight: 600; }
   .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; }
+  /* ============ IN-CARD THEME TABS + ALT PANES (opt-in via alt_themes_in_card) ============ */
+  .in-card-tabs { position: absolute; top: 10px; right: 14px; z-index: 5;
+    display: flex; gap: 4px; background: rgba(255, 253, 242, 0.95); border: 2.5px solid #2a3a4a;
+    border-radius: 10px; padding: 3px; box-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+  .in-card-tab { padding: 5px 11px; border: none; background: transparent; color: #2a3a4a;
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer;
+    border-radius: 7px; letter-spacing: 0.5px; text-transform: uppercase; transition: all 0.12s; }
+  .in-card-tab:hover { background: #f0e4cc; }
+  .in-card-tab.active { background: #ffd24a; color: #2a3a4a; box-shadow: 0 2px 0 #c9a020; }
+  .in-card-tab .ic { margin-right: 4px; }
+  .theme-pane { display: none; }
+  .theme-pane.active { display: block; }
+  #pane-solar.active, #pane-worldmap.active { min-height: 540px; background: #fffdf2; }
+  #pane-solar svg, #pane-worldmap svg { width: 100%; height: auto; display: block; max-height: 720px; }
+  .pane-loading { display: flex; align-items: center; justify-content: center; height: 540px;
+    color: #6a7a8a; font-family: 'Fredoka', sans-serif; font-size: 14px; font-weight: 500; }
+  .pane-error { color: #c44545; }
+  /* Quest modal (shared by all themes when in-card tabs are on) */
+  .qm-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .qm-modal-backdrop.open { display: flex; }
+  .qm-modal { background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; padding: 24px; width: 480px; max-width: 90vw; color: #2a3a4a; box-shadow: 0 16px 60px rgba(0,0,0,0.6); font-family: 'Fredoka', sans-serif; }
+  .qm-modal .qm-name-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+  .qm-modal h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 700; }
+  .qm-modal .qm-rename-btn { background: transparent; border: 1.5px solid #c9a020; color: #c9a020; border-radius: 6px; padding: 2px 8px; font-family: 'Fredoka', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; height: 24px; }
+  .qm-modal .qm-id { color: #c9a020; font-size: 11px; margin-bottom: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .qm-modal .qm-meta { color: #6a7a8a; font-size: 13px; margin-bottom: 5px; font-family: -apple-system, sans-serif; }
+  .qm-modal .qm-prog-bar { height: 12px; background: #f0e4cc; border: 2px solid #2a3a4a; border-radius: 8px; margin: 14px 0; overflow: hidden; }
+  .qm-modal .qm-prog-fill { height: 100%; background: linear-gradient(180deg, #ff8a4a, #ff5a20); }
+  .qm-modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .qm-modal-actions a, .qm-modal-actions button { flex: 1; padding: 10px 14px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; text-align: center; font-family: 'Fredoka', sans-serif; box-shadow: 0 3px 0 #c9a020; text-transform: uppercase; letter-spacing: 1px; }
+  .qm-modal-actions .secondary { background: #fff; }
+  .qm-modal-actions a:hover, .qm-modal-actions button:hover { transform: translateY(1px); box-shadow: 0 2px 0 #c9a020; }
+  .qm-rename-input { width: 100%; padding: 8px 10px; font-family: 'Fredoka', sans-serif; font-size: 14px; font-weight: 700; border: 2px solid #2a3a4a; border-radius: 6px; background: #fff; color: #2a3a4a; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -81,6 +116,14 @@
   </header>
 
   <div class="map-wrap">
+    {{#if alt_themes_in_card}}
+    <div class="in-card-tabs">
+      <button class="in-card-tab active" data-theme="default" onclick="qmSwitchTheme('default')"><span class="ic">📍</span>Default</button>
+      <button class="in-card-tab" data-theme="solar" onclick="qmSwitchTheme('solar')"><span class="ic">🌌</span>Solar</button>
+      <button class="in-card-tab" data-theme="worldmap" onclick="qmSwitchTheme('worldmap')"><span class="ic">🗺</span>Worldmap</button>
+    </div>
+    <div id="pane-default" class="theme-pane active">
+    {{/if}}
     <svg class="map" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid slice">
       <!-- Sky strip -->
       <rect x="0" y="0" width="1200" height="60" fill="#bbe4f5"/>
@@ -164,6 +207,11 @@
         <text x="0" y="-32" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="10" fill="#2a3a4a">N</text>
       </g>
     </svg>
+    {{#if alt_themes_in_card}}
+    </div>
+    <div id="pane-solar" class="theme-pane"></div>
+    <div id="pane-worldmap" class="theme-pane"></div>
+    {{/if}}
   </div>
 
   <div class="legend">
@@ -184,5 +232,140 @@
     </div>
   </footer>
 </div>
+{{#if alt_themes_in_card}}
+<!-- ===== In-card alt themes — modal + tab switching ===== -->
+<div class="qm-modal-backdrop" id="qm-modal-backdrop">
+  <div class="qm-modal">
+    <div class="qm-name-row">
+      <h3 id="qm-name">Quest Name</h3>
+      <button class="qm-rename-btn" id="qm-rename-btn" onclick="qmStartRename()">✏ Rename</button>
+    </div>
+    <div id="qm-rename-edit" style="display:none;margin-bottom:10px;">
+      <input id="qm-rename-input" class="qm-rename-input" type="text" maxlength="200"/>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button onclick="qmCommitRename()" style="flex:1;padding:6px;background:#5e9a4a;color:#fff;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+        <button onclick="qmCancelRename()" style="flex:1;padding:6px;background:#fff;color:#2a3a4a;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Cancel</button>
+      </div>
+      <div id="qm-rename-err" style="margin-top:6px;color:#c44545;font-size:11px;display:none;font-family:-apple-system,sans-serif;"></div>
+    </div>
+    <div class="qm-id" id="qm-id">id</div>
+    <div class="qm-meta" id="qm-status">Status: …</div>
+    <div class="qm-meta" id="qm-tags" style="display:none;"></div>
+    <div class="qm-prog-bar"><div class="qm-prog-fill" id="qm-prog-fill" style="width:0%;"></div></div>
+    <div class="qm-meta" id="qm-prog-text">0% complete</div>
+    <div class="qm-modal-actions">
+      <a id="qm-open-card" href="#" target="_blank">Open quest card →</a>
+      <button class="secondary" onclick="qmCloseModal()">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  const PROJ = "{{id}}";
+  const QUESTS = {{{quests_json_blob}}};
+  const QUEST_BY_ID = {};
+  for (const q of QUESTS) QUEST_BY_ID[q.id] = q;
+
+  const altCache = {};
+  let _current = null;
+
+  async function loadAlt(theme) {
+    if (altCache[theme]) return altCache[theme];
+    const resp = await fetch('/' + PROJ + '/route-' + theme + '.html');
+    if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
+    const txt = await resp.text();
+    const m = txt.match(/<svg[\s\S]*?<\/svg>/);
+    if (!m) throw new Error('no <svg> in alt route');
+    altCache[theme] = m[0];
+    return m[0];
+  }
+
+  window.qmSwitchTheme = async function(theme) {
+    document.querySelectorAll('.in-card-tab').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+    document.querySelectorAll('.theme-pane').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById('pane-' + theme);
+    if (!target) return;
+    target.classList.add('active');
+    if (theme !== 'default') {
+      try {
+        target.innerHTML = '<div class="pane-loading">Loading ' + theme + '…</div>';
+        target.innerHTML = await loadAlt(theme);
+      } catch (e) {
+        target.innerHTML = '<div class="pane-loading pane-error">⚠ ' + e.message + '</div>';
+      }
+    }
+  };
+
+  window.openModal = function(data) {
+    if (typeof data === 'string') data = QUEST_BY_ID[data] || {id: data, name: data};
+    _current = data;
+    document.getElementById('qm-name').textContent = data.name || data.id;
+    document.getElementById('qm-id').textContent = 'id: ' + data.id;
+    document.getElementById('qm-status').textContent = 'Status: ' + (data.status || '—');
+    const tagsEl = document.getElementById('qm-tags');
+    if (data.tags && data.tags.length) { tagsEl.textContent = 'Tags: ' + data.tags.join(', '); tagsEl.style.display = 'block'; } else tagsEl.style.display = 'none';
+    const pct = Math.round((data.progress || 0) * 100);
+    document.getElementById('qm-prog-fill').style.width = pct + '%';
+    document.getElementById('qm-prog-text').textContent = pct + '% complete';
+    document.getElementById('qm-open-card').href = '/' + PROJ + '/plan-card.html?q=' + encodeURIComponent(data.id);
+    qmCancelRename();
+    document.getElementById('qm-rename-btn').style.display = (data.id && data.id !== 'long-term') ? '' : 'none';
+    document.getElementById('qm-modal-backdrop').classList.add('open');
+  };
+  window.qmCloseModal = function() { document.getElementById('qm-modal-backdrop').classList.remove('open'); };
+  window.qmStartRename = function() {
+    if (!_current) return;
+    const inp = document.getElementById('qm-rename-input');
+    inp.value = _current.name || _current.id;
+    document.getElementById('qm-rename-edit').style.display = 'block';
+    document.getElementById('qm-rename-btn').style.display = 'none';
+    document.getElementById('qm-rename-err').style.display = 'none';
+    inp.focus(); inp.select();
+  };
+  window.qmCancelRename = function() {
+    document.getElementById('qm-rename-edit').style.display = 'none';
+    document.getElementById('qm-rename-btn').style.display = (_current && _current.id !== 'long-term') ? '' : 'none';
+    document.getElementById('qm-rename-err').style.display = 'none';
+  };
+  window.qmCommitRename = async function() {
+    if (!_current) return;
+    const newName = document.getElementById('qm-rename-input').value.trim();
+    const err = document.getElementById('qm-rename-err');
+    if (!newName) { err.textContent = 'Name cannot be empty'; err.style.display = 'block'; return; }
+    try {
+      const resp = await fetch('/api/quest/rename', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({project: PROJ, id: _current.id, name: newName})
+      });
+      const j = await resp.json();
+      if (!resp.ok || !j.ok) throw new Error(j.error || j.msg || ('HTTP ' + resp.status));
+      _current.name = newName;
+      if (QUEST_BY_ID[_current.id]) QUEST_BY_ID[_current.id].name = newName;
+      document.getElementById('qm-name').textContent = newName;
+      qmCancelRename();
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e) {
+      err.textContent = 'Rename failed: ' + e.message;
+      err.style.display = 'block';
+    }
+  };
+
+  // Click delegation for default-theme SVG quest pins (they have data-quest attrs)
+  document.addEventListener('click', e => {
+    const g = e.target.closest('[data-quest]');
+    if (g && document.getElementById('pane-default') && document.getElementById('pane-default').contains(g)) {
+      const id = g.getAttribute('data-quest');
+      const q = QUEST_BY_ID[id];
+      if (q) openModal(q); else openModal({id: id, name: id, status: 'unknown', progress: 0, tags: []});
+    }
+  });
+  document.getElementById('qm-modal-backdrop').addEventListener('click', e => { if (e.target.id === 'qm-modal-backdrop') qmCloseModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('qm-rename-edit').style.display === 'block') qmCommitRename();
+    if (e.key === 'Escape') { qmCancelRename(); qmCloseModal(); }
+  });
+})();
+</script>
+{{/if}}
 </body>
 </html>

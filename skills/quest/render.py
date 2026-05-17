@@ -200,6 +200,19 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
     project["active"] = active or {"name": "", "next_step": "", "progress": 0, "n": 0}
     project["active_progress_pct"] = int(100 * project["active"].get("progress", 0))
 
+    # Compact JSON blob for in-card-tabs JS (id→quest lookup on click)
+    minimal = []
+    for q in quests:
+        minimal.append({
+            "id": q.get("id", ""),
+            "name": q.get("name", "") or q.get("id", ""),
+            "n": q.get("n"),
+            "status": q.get("status", ""),
+            "progress": q.get("progress", 0),
+            "tags": q.get("tags") or [],
+        })
+    project["quests_json_blob"] = json.dumps(minimal, ensure_ascii=False)
+
     theme = project.get("theme", "pokemon")
     positions = (theme_meta.get(theme, {}) or {}).get("positions", {})
 
@@ -1305,6 +1318,25 @@ def render_all() -> int:
 
     # Global index
     (SITE / "index.html").write_text(render_global_index(data), encoding="utf-8")
+
+    # Alt-theme hook (additive — solar + worldmap routes + switcher injection).
+    # Lazy import so any failure here cannot break the default render.
+    try:
+        import importlib.util
+        alt_path = THEMES / "alt_render.py"
+        if alt_path.exists():
+            spec = importlib.util.spec_from_file_location("_quest_alt_render", alt_path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            for pid, project in data["projects"].items():
+                site_dir = SITE / pid
+                site_dir.mkdir(parents=True, exist_ok=True)
+                (site_dir / "route-solar.html").write_text(mod.render_solar(pid, project), encoding="utf-8")
+                (site_dir / "route-worldmap.html").write_text(mod.render_worldmap(pid, project), encoding="utf-8")
+                # No more top-of-body banner injection — in-card tabs replace it (template-side, gated by `alt_themes_in_card`).
+            print(f"  alt-themes: solar + worldmap rendered for {len(data['projects'])} project(s)")
+    except Exception as exc:
+        print(f"  WARN: alt-theme render failed (default theme still OK): {exc}", file=sys.stderr)
 
     print(f"OK — {rendered} project(s), {md_written} quest briefings rendered to {SITE}")
     return 0

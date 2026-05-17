@@ -295,6 +295,24 @@ def run_from_stdin() -> int:
               "prompt": prompt[:80]})
         return 0
 
+    # URL-lock sentinel check: when ~/.claude/hooks/quest-url-rebind.sh just
+    # hard-rebound the claim via plan-card URL paste, short-circuit both rebind
+    # and suggest paths for 60s. Prevents IDF token overlap from silently
+    # undoing the operator's explicit URL paste in the same turn.
+    # Companion: feedback_quest_reclaim_on_topic_shift_2026-05-15.md.
+    url_lock_file = RUN_DIR / f"session-{sk}.url-locked"
+    if url_lock_file.is_file():
+        try:
+            expiry = int(url_lock_file.read_text(encoding="utf-8").strip())
+            if expiry > time.time():
+                _log({"ts": _ts(), "sk": sk, "action": "skip",
+                      "acted": "skipped_url_locked", "expiry": expiry,
+                      "prompt": prompt[:80]})
+                return 0
+            url_lock_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     project = _resolve_project(cwd)
     if not project:
         _log({"ts": _ts(), "sk": sk, "action": "skip", "acted": "no-project",

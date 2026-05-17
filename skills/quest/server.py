@@ -213,6 +213,8 @@ class QuestHandler(SimpleHTTPRequestHandler):
             self._handle_bind(body)
         elif path == "/api/tags/unbind":
             self._handle_unbind(body)
+        elif path == "/api/quest/rename":
+            self._handle_rename(body)
         else:
             self._json(404, {"error": "unknown endpoint"})
 
@@ -307,6 +309,35 @@ class QuestHandler(SimpleHTTPRequestHandler):
 
         ok, msg, tags = _do_mutate(project, quest_id, mutate)
         self._json(200 if ok else 400, {"ok": ok, "msg": msg, "tags": tags})
+
+    def _handle_rename(self, body: dict) -> None:
+        """POST /api/quest/rename — body {project, id, name}.
+        Renames quest.name in quests.json (operator override; autosync never touches name).
+        Re-renders all themes after save."""
+        project = (body.get("project") or "").strip()
+        quest_id = (body.get("id") or "").strip()
+        new_name = (body.get("name") or "").strip()
+        if not project or not quest_id:
+            self._json(400, {"error": "project and id required"})
+            return
+        if not new_name:
+            self._json(400, {"error": "name cannot be empty"})
+            return
+        if len(new_name) > 200:
+            self._json(400, {"error": "name too long (max 200 chars)"})
+            return
+
+        old_name_box = {"v": None}
+
+        def mutate(q: dict) -> None:
+            old_name_box["v"] = q.get("name")
+            q["name"] = new_name
+
+        ok, msg, _ = _do_mutate(project, quest_id, mutate)
+        if ok:
+            self._json(200, {"ok": True, "msg": "renamed", "old_name": old_name_box["v"], "new_name": new_name})
+        else:
+            self._json(400, {"ok": False, "msg": msg})
 
     def _session_info(self) -> dict:
         key, label = _session_label()
