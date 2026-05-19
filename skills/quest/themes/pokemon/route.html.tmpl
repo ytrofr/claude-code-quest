@@ -115,6 +115,81 @@
     </div>
   </header>
 
+  {{#if has_backlog}}
+  <!-- ===== Wishlist Tray (mission ideas waiting to become quests) ===== -->
+  <style>
+    .wt-tray { background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4), transparent 60%), #e8d4a8; border: 3px dashed #6a3a18; border-radius: 12px; padding: 22px 24px 18px; margin: 12px 0 18px; position: relative; color: #2a3a4a; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+    .wt-tray::before { content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); width: 18px; height: 18px; background: radial-gradient(circle at 35% 35%, #d63a3a 30%, #8a1010 65%, transparent 70%); border-radius: 50%; box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+    .wt-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px dashed #8a5a30; }
+    .wt-icon { width: 36px; height: 36px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 0 #c9a020; color: #2a3a4a; }
+    .wt-title-block { flex: 1; }
+    .wt-title { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 16px; color: #2a3a4a; text-transform: uppercase; letter-spacing: 1.5px; }
+    .wt-sub { font-size: 11px; color: #8a5a30; font-family: -apple-system, sans-serif; font-weight: 500; margin-top: 2px; }
+    .wt-actions { display: flex; gap: 8px; }
+    .wt-btn { min-height: 36px; padding: 6px 14px; border-radius: 8px; border: 2px solid #2a3a4a; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 2px 0 rgba(0,0,0,0.3); display: inline-flex; align-items: center; gap: 6px; color: #2a3a4a; }
+    .wt-btn:hover { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+    .wt-btn-cream { background: #fffdf2; }
+    .wt-btn-gold { background: #ffd24a; }
+    .wt-notes { display: grid; gap: 10px; }
+    .wt-note { background: #fffdf2; border: 2px solid #8a5a30; border-radius: 6px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+    .wt-tick { width: 18px; height: 18px; border: 2.5px solid #2a3a4a; border-radius: 4px; background: #fff; flex-shrink: 0; }
+    .wt-note-text { flex: 1; min-width: 0; }
+    .wt-note-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 13px; color: #2a3a4a; line-height: 1.4; }
+    .wt-note-meta { font-family: -apple-system, sans-serif; font-size: 11px; color: #6a7a8a; margin-top: 3px; line-height: 1.5; }
+    .wt-note-meta b { color: #6a3a18; font-family: 'Fredoka', sans-serif; }
+    .wt-note-meta.danger { color: #b8341a; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+    .wt-inline { font-family: 'JetBrains Mono', monospace; background: #f8e8c8; padding: 1px 5px; border: 1px solid #8a5a30; border-radius: 3px; font-size: 12px; }
+  </style>
+  <section class="wt-tray" aria-label="Wishlist of mission ideas">
+    <div class="wt-head">
+      <span class="wt-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <path d="M4 20 L8 16 M8 16 C 8 8, 14 4, 20 4 C 20 10, 16 16, 8 16 Z"/>
+        </svg>
+      </span>
+      <div class="wt-title-block">
+        <div class="wt-title">Wishlist · {{backlog_count}} ideas</div>
+        <div class="wt-sub">{{backlog_ready_count}} ready · {{backlog_sparse_count}} sparse · edit <code style="font-family:'JetBrains Mono',monospace;background:#f8e8c8;padding:1px 5px;border:1px solid #8a5a30;border-radius:3px;font-size:11px;">data/backlog/{{id}}.md</code></div>
+      </div>
+      <div class="wt-actions">
+        <button type="button" class="wt-btn wt-btn-cream" onclick="window.openQuestEditor &amp;&amp; window.openQuestEditor('backlog', '{{id}}', '{{name}} · Backlog');" aria-label="Edit backlog file">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M2 14 L4 10 L11 3 L13 5 L6 12 L2 14 Z M9 5 L11 7"/></svg>
+          Edit
+        </button>
+        <button type="button" class="wt-btn wt-btn-gold" onclick="alert('Promotion ritual not wired yet — coming next.\nFor now run: /quest promote {{id}}');" aria-label="Scribe all unchecked ideas into quests">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 20 L8 16 M8 16 C 8 8, 14 4, 20 4 C 20 10, 16 16, 8 16 Z"/></svg>
+          Scribe all
+        </button>
+      </div>
+    </div>
+    <div class="wt-notes">
+      {{#each backlog}}
+      <div class="wt-note">
+        <span class="wt-tick" aria-label="Unchecked"></span>
+        <div class="wt-note-text">
+          <div class="wt-note-title">{{{q.title_html}}}</div>
+          {{#if q.sparse}}
+          <div class="wt-note-meta danger">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M8 2 L14 13 L2 13 Z"/><path d="M8 6 V9 M8 11 V11.5" stroke-linecap="round"/></svg>
+            sparse — needs Why &amp; Effort before scribing
+          </div>
+          {{/if}}
+          {{#if q.why}}
+          <div class="wt-note-meta">
+            <b>Why:</b> {{q.why}}{{#if q.effort}} &nbsp;·&nbsp; <b>Effort:</b> {{q.effort}}{{/if}}{{#if q.tag}} &nbsp;·&nbsp; #{{q.tag}}{{/if}}
+          </div>
+          {{/if}}
+        </div>
+        <button type="button" class="wt-btn wt-btn-cream" onclick="alert('Per-note scribe not wired yet — coming next.\nFor now run: /quest promote {{id}}');" aria-label="Scribe this idea">
+          Scribe
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8 H13 M9 4 L13 8 L9 12"/></svg>
+        </button>
+      </div>
+      {{/each}}
+    </div>
+  </section>
+  {{/if}}
+
   <div class="map-wrap">
     {{#if alt_themes_in_card}}
     <div class="in-card-tabs">
@@ -367,5 +442,7 @@
 })();
 </script>
 {{/if}}
+{{> _edit-modal}}
+
 </body>
 </html>

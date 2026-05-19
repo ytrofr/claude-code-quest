@@ -1,0 +1,314 @@
+<!-- Partial: _edit-modal — in-browser markdown editor for backlog + sidecar files.
+     Called from any surface via: openQuestEditor(kind, fileId, label)
+       kind    — "backlog" or "notes"
+       fileId  — for backlog: project id (e.g. "ogas")
+                 for notes:   "<proj>__<quest>" (e.g. "ogas__some-quest-id")
+       label   — friendly title shown at top of modal
+
+     Flow: GET /api/file/<kind>/<id> → fill textarea → Save POSTs back → server
+     writes file + re-renders → modal closes → page reloads to show changes.
+     Source: ~/.claude/quest/data/{backlog,notes}/<id>.md
+-->
+<style>
+  /* Modal shell — scoped under #qd-edit-backdrop to avoid leaking. */
+  #qd-edit-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 1000;
+    font-family: 'Fredoka', system-ui, sans-serif;
+  }
+  #qd-edit-backdrop.open { display: flex; }
+  #qd-edit-modal {
+    background: #fffdf2;
+    border: 4px solid #2a3a4a;
+    border-radius: 16px;
+    width: min(800px, 92vw);
+    max-height: 88vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.6);
+    color: #2a3a4a;
+    overflow: hidden;
+  }
+  #qd-edit-modal .qd-em-head {
+    padding: 16px 24px;
+    background: linear-gradient(180deg, #8a5a30, #6a3a18);
+    color: #ffd24a;
+    border-bottom: 4px solid #2a3a4a;
+    display: flex; align-items: center; gap: 12px;
+  }
+  #qd-edit-modal .qd-em-title {
+    font-size: 18px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    flex: 1;
+  }
+  #qd-edit-modal .qd-em-sub {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; opacity: 0.85;
+    margin-top: 2px;
+    text-transform: none; letter-spacing: 0;
+  }
+  #qd-edit-modal .qd-em-close {
+    background: #fffdf2; color: #2a3a4a;
+    border: 2.5px solid #2a3a4a; border-radius: 8px;
+    width: 36px; height: 36px;
+    cursor: pointer;
+    font-weight: 900; font-size: 18px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  #qd-edit-modal .qd-em-close:hover { background: #ffd24a; }
+  #qd-edit-modal .qd-em-body {
+    padding: 20px 24px;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; gap: 12px;
+    overflow: hidden;
+  }
+  #qd-edit-modal .qd-em-status {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: #6a7a8a;
+    min-height: 18px;
+  }
+  #qd-edit-modal .qd-em-status.err { color: #b8341a; font-weight: 700; }
+  #qd-edit-modal .qd-em-status.ok  { color: #1a6a3a; font-weight: 700; }
+  #qd-edit-modal textarea {
+    flex: 1; min-height: 320px;
+    width: 100%; box-sizing: border-box;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; line-height: 1.65;
+    color: #2a3a4a;
+    background: #f8e8c8;
+    border: 3px solid #8a5a30;
+    border-radius: 8px;
+    resize: vertical;
+    tab-size: 2;
+  }
+  #qd-edit-modal textarea:focus {
+    outline: 3px solid #ffd24a;
+    outline-offset: 2px;
+  }
+  #qd-edit-modal .qd-em-foot {
+    padding: 14px 24px 16px;
+    background: #f0e4cc;
+    border-top: 3px solid #8a5a30;
+    display: flex; align-items: center; gap: 12px;
+  }
+  #qd-edit-modal .qd-em-hint {
+    flex: 1;
+    font-family: -apple-system, sans-serif;
+    font-size: 11px; color: #6a7a8a;
+  }
+  #qd-edit-modal .qd-em-hint kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: #fffdf2;
+    border: 1px solid #c0a878;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  #qd-edit-modal .qd-em-btn {
+    min-height: 44px;
+    padding: 10px 22px;
+    border: 2.5px solid #2a3a4a;
+    border-radius: 10px;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700; font-size: 13px;
+    cursor: pointer;
+    text-transform: uppercase; letter-spacing: 1px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+    color: #2a3a4a;
+  }
+  #qd-edit-modal .qd-em-btn:hover { transform: translateY(1px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+  #qd-edit-modal .qd-em-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+  #qd-edit-modal .qd-em-btn-cancel { background: #fffdf2; }
+  #qd-edit-modal .qd-em-btn-save   { background: #ffd24a; box-shadow: 0 3px 0 #c9a020; }
+</style>
+<div id="qd-edit-backdrop" role="dialog" aria-modal="true" aria-labelledby="qd-em-title" hidden>
+  <div id="qd-edit-modal">
+    <div class="qd-em-head">
+      <div style="flex:1;">
+        <div class="qd-em-title" id="qd-em-title">Edit</div>
+        <div class="qd-em-sub" id="qd-em-sub">…</div>
+      </div>
+      <button type="button" class="qd-em-close" id="qd-em-close" aria-label="Close editor">×</button>
+    </div>
+    <div class="qd-em-body">
+      <div class="qd-em-status" id="qd-em-status">Loading…</div>
+      <textarea id="qd-em-textarea" spellcheck="false" aria-label="Markdown content"></textarea>
+    </div>
+    <div class="qd-em-foot">
+      <div class="qd-em-hint"><kbd>Tab</kbd> indents · <kbd>Ctrl</kbd>+<kbd>S</kbd> saves · <kbd>Esc</kbd> cancels</div>
+      <button type="button" class="qd-em-btn qd-em-btn-cancel" id="qd-em-cancel">Cancel</button>
+      <button type="button" class="qd-em-btn qd-em-btn-save" id="qd-em-save">Save</button>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  if (window.openQuestEditor) return;  // partial may be injected twice; idempotent
+  const $back  = document.getElementById('qd-edit-backdrop');
+  const $modal = document.getElementById('qd-edit-modal');
+  const $title = document.getElementById('qd-em-title');
+  const $sub   = document.getElementById('qd-em-sub');
+  const $ta    = document.getElementById('qd-em-textarea');
+  const $stat  = document.getElementById('qd-em-status');
+  const $save  = document.getElementById('qd-em-save');
+  const $cancel = document.getElementById('qd-em-cancel');
+  const $close = document.getElementById('qd-em-close');
+
+  let current = null;  // {kind, fileId, originalContent}
+
+  function setStatus(msg, cls) {
+    $stat.textContent = msg || '';
+    $stat.className = 'qd-em-status' + (cls ? ' ' + cls : '');
+  }
+
+  function close() {
+    $back.classList.remove('open');
+    $back.hidden = true;
+    current = null;
+    $ta.value = '';
+    setStatus('');
+  }
+
+  // Templates for new/empty files — give the parser something it understands.
+  // sidecar.py only recognises `- [ ]` todos + content under `## Notes`, so a
+  // bare textarea would silently round-trip to "empty" on save. Seed the
+  // structure on first open instead.
+  const TEMPLATES = {
+    notes:   '## Todos\n\n- [ ] \n\n## Notes\n\n',
+    backlog: '# Backlog\n\nDrop ideas as `- [ ]` lines. Optional sub-bullets `Why:` / `Effort:` / `Tag:` let Bobby pack them without a clarifying round.\n\n- [ ] \n',
+  };
+
+  // A sidecar/backlog file with non-whitespace content that nonetheless lacks
+  // any of these markers will render as empty after save — warn the user so
+  // they realise their edit was lost rather than silently failing.
+  function looksUnstructured(kind, text) {
+    const t = (text || '').trim();
+    if (!t) return false;
+    if (/^\s*-\s*\[[ xX]\]\s/m.test(t)) return false;  // has a checkbox
+    if (kind === 'notes' && /^##\s+notes\b/im.test(t)) return false;  // has Notes section
+    return true;
+  }
+
+  async function open(kind, fileId, label) {
+    current = { kind, fileId, originalContent: '' };
+    $title.textContent = label || `Edit ${kind}`;
+    $sub.textContent   = `data/${kind}/${fileId}.md`;
+    $ta.value = '';
+    $save.disabled = true;
+    $back.hidden = false;
+    $back.classList.add('open');
+    setStatus('Loading…');
+    try {
+      const resp = await fetch(`/api/file/${encodeURIComponent(kind)}/${encodeURIComponent(fileId)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      let content = data.content || '';
+      let cursorAfterLoad = null;
+      if (!content.trim()) {
+        // Fresh / empty file — seed the canonical structure so users land
+        // inside the right shape rather than typing bare text the parser drops.
+        content = TEMPLATES[kind] || '';
+        // Place cursor after the first "- [ ] " so they can start typing immediately.
+        const todoMarker = content.indexOf('- [ ] ');
+        cursorAfterLoad = todoMarker >= 0 ? todoMarker + 6 : content.length;
+        setStatus('New file — template loaded · start where the cursor sits');
+      } else if (looksUnstructured(kind, content)) {
+        setStatus('⚠ Saved content doesn\'t match the format — wrap notes in `## Notes` or use `- [ ]` lines', 'err');
+      } else {
+        setStatus(`Loaded ${content.length} chars`);
+      }
+      $ta.value = content;
+      current.originalContent = content;
+      $save.disabled = false;
+      setTimeout(() => {
+        $ta.focus();
+        if (cursorAfterLoad !== null) $ta.setSelectionRange(cursorAfterLoad, cursorAfterLoad);
+        else $ta.setSelectionRange($ta.value.length, $ta.value.length);
+      }, 30);
+    } catch (e) {
+      setStatus(`Load failed: ${e.message}`, 'err');
+    }
+  }
+
+  // For unstructured text that the parser would otherwise drop, wrap it so it
+  // renders. Notes-kind: prepend `## Notes\n\n`. Backlog-kind: prepend a `- [ ]`
+  // marker so the first line becomes a backlog idea.
+  function autoStructure(kind, text) {
+    const t = (text || '').trim();
+    if (!t) return '';  // empty save = empty file, no wrapping
+    if (!looksUnstructured(kind, t)) return text;  // already structured, untouched
+    if (kind === 'notes')   return '## Notes\n\n' + t + '\n';
+    if (kind === 'backlog') return '# Backlog\n\n- [ ] ' + t.replace(/\n+/g, ' ') + '\n';
+    return text;
+  }
+
+  async function save() {
+    if (!current) return;
+    $save.disabled = true;
+    $cancel.disabled = true;
+    const wrapped = autoStructure(current.kind, $ta.value);
+    const wasWrapped = wrapped !== $ta.value;
+    setStatus(wasWrapped ? 'Wrapping unstructured text in `## Notes` · saving…' : 'Saving…');
+    try {
+      const resp = await fetch(`/api/file/${encodeURIComponent(current.kind)}/${encodeURIComponent(current.fileId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: wrapped }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      if (!data.render_ok) {
+        // File saved, but render failed — let the user know without forcing reload
+        setStatus(`Saved ${data.bytes} bytes, but render failed: ${data.render_err}`, 'err');
+        $save.disabled = false;
+        $cancel.disabled = false;
+        return;
+      }
+      setStatus(`Saved ${data.bytes} bytes · reloading…`, 'ok');
+      // Tiny pause so the user sees the OK status flash before reload
+      setTimeout(() => { window.location.reload(); }, 300);
+    } catch (e) {
+      setStatus(`Save failed: ${e.message}`, 'err');
+      $save.disabled = false;
+      $cancel.disabled = false;
+    }
+  }
+
+  function maybeCancel() {
+    if (current && $ta.value !== current.originalContent) {
+      if (!confirm('Discard unsaved changes?')) return;
+    }
+    close();
+  }
+
+  $save.addEventListener('click', save);
+  $cancel.addEventListener('click', maybeCancel);
+  $close.addEventListener('click', maybeCancel);
+  $back.addEventListener('click', (e) => { if (e.target === $back) maybeCancel(); });
+
+  // Tab inserts a tab; Ctrl/Cmd+S saves; Esc cancels
+  $ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = $ta.selectionStart, eEnd = $ta.selectionEnd;
+      $ta.setRangeText('  ', s, eEnd, 'end');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (!$save.disabled) save();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!$back.classList.contains('open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); maybeCancel(); }
+  });
+
+  // Public API
+  window.openQuestEditor = open;
+})();
+</script>

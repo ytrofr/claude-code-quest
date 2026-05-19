@@ -30,6 +30,7 @@ DATA = ROOT / "quest" / "data" / "quests.json"
 SITE = ROOT / "quest" / "site"
 THEMES = ROOT / "skills" / "quest" / "themes"
 RUN_DIR = ROOT / "quest" / "run"
+BACKLOG_DIR = ROOT / "quest" / "data" / "backlog"
 
 VIEWS = ["route", "quest-log", "plan-card"]
 
@@ -106,6 +107,7 @@ HOISTED_QUEST_FIELDS = (
     "my_todo", "my_todo_done", "my_todo_total", "my_todo_next",
     "my_notes", "my_notes_html", "my_todo_has", "my_todo_empty",
     "my_todo_file_path", "my_todo_editor_href",  # editor deeplink (vscode://file/...)
+    "my_todo_quest_key",  # "<proj>__<quest>" for in-browser /api/file/notes/<key>
 )
 
 
@@ -176,9 +178,76 @@ def humanize_iso(iso_str: str) -> str:
         return ""
 
 
+def _load_backlog(project_id: str) -> list[dict]:
+    """Parse backlog/<pid>.md into a list of idea dicts.
+
+    Each `- [ ]` or `- [x]` line is an idea; immediately-following indented
+    `Why:` / `Effort:` / `Tag:` sub-bullets attach to that idea. An idea is
+    `sparse` when it has neither Why nor Effort (Bobby will ask before
+    scribing). Returns [] when no file exists for this project.
+    """
+    f = BACKLOG_DIR / f"{project_id}.md"
+    if not f.exists():
+        return []
+    ideas: list[dict] = []
+    cur: dict | None = None
+    for raw in f.read_text(encoding="utf-8").splitlines():
+        # New idea
+        m_top = re.match(r"^- \[( |x|X)\]\s+(.+?)\s*$", raw)
+        if m_top:
+            if cur is not None:
+                ideas.append(cur)
+            checked = m_top.group(1).lower() == "x"
+            cur = {
+                "title": m_top.group(2),
+                "checked": checked,
+                "why": "",
+                "effort": "",
+                "tag": "",
+            }
+            continue
+        # Sub-bullet on the current idea (indented key:value)
+        if cur is not None:
+            m_sub = re.match(r"^\s{2,}([A-Za-z]+)\s*:\s*(.+?)\s*$", raw)
+            if m_sub:
+                key = m_sub.group(1).lower()
+                val = m_sub.group(2)
+                if key in ("why", "effort", "tag"):
+                    cur[key] = val
+    if cur is not None:
+        ideas.append(cur)
+    # Mark sparse + html-escape title for safe template injection
+    for idea in ideas:
+        idea["sparse"] = not idea["checked"] and not idea["why"] and not idea["effort"]
+        # Escape title (renderer's `{{var}}` does no HTML escaping)
+        idea["title_html"] = (idea["title"]
+                              .replace("&", "&amp;")
+                              .replace("<", "&lt;")
+                              .replace(">", "&gt;"))
+        # Backtick→inline code for the title (lightweight: ` ... ` → <code>...</code>)
+        idea["title_html"] = re.sub(
+            r"`([^`]+)`",
+            r'<code class="wt-inline">\1</code>',
+            idea["title_html"],
+        )
+    return ideas
+
+
 def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map: dict | None = None) -> dict:
     """Add derived fields used by templates. Mutates and returns project."""
     project["id"] = project_id
+
+    # Backlog (Wishlist Tray) — optional per-project markdown file. When present,
+    # populates `backlog` (list of idea dicts) + `has_backlog` (bool truthy flag
+    # that the worldmap route template gates the tray render on).
+    backlog = _load_backlog(project_id)
+    unchecked = [i for i in backlog if not i["checked"]]
+    sparse_n = sum(1 for i in unchecked if i["sparse"])
+    project["backlog"] = unchecked  # only show unchecked in the tray
+    project["has_backlog"] = bool(unchecked)
+    project["backlog_count"] = len(unchecked)
+    project["backlog_ready_count"] = len(unchecked) - sparse_n
+    project["backlog_sparse_count"] = sparse_n
 
     # Status counts
     quests = project["quests"]
@@ -200,9 +269,18 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
     project["active"] = active or {"name": "", "next_step": "", "progress": 0, "n": 0}
     project["active_progress_pct"] = int(100 * project["active"].get("progress", 0))
 
-    # Compact JSON blob for in-card-tabs JS (id→quest lookup on click)
+    # Compact JSON blob for in-card-tabs JS (id→quest lookup on click).
+    # Includes enough rich fields for the route map's quest-detail modal to render
+    # problem / solution / tasks summary / next step / files-touched count without
+    # a second fetch. Long-form bodies (full task list, briefing) stay in plan-card.
     minimal = []
     for q in quests:
+        tasks = q.get("tasks") or []
+        tasks_done = sum(1 for t in tasks if (t.get("status_class") == "done" or t.get("done") is True))
+        next_task = next((t.get("title", "") for t in tasks if t.get("status_class") != "done" and not t.get("done")), "")
+        files = q.get("files_touched") or []
+        problem = (q.get("problem") or q.get("desc") or "").strip()
+        solution = (q.get("solution") or q.get("fix") or "").strip()
         minimal.append({
             "id": q.get("id", ""),
             "name": q.get("name", "") or q.get("id", ""),
@@ -210,6 +288,14 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
             "status": q.get("status", ""),
             "progress": q.get("progress", 0),
             "tags": q.get("tags") or [],
+            "problem": problem[:240],
+            "solution": solution[:240],
+            "tasks_done": tasks_done,
+            "tasks_total": len(tasks),
+            "next_step": (q.get("next_step") or next_task or "").strip()[:200],
+            "files_count": len(files),
+            "files": [f.get("path", "") if isinstance(f, dict) else str(f) for f in files[:6]],
+            "branch": q.get("branch", "") or "",
         })
     project["quests_json_blob"] = json.dumps(minimal, ensure_ascii=False)
 
@@ -298,7 +384,20 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
         if q.get("kpi"):
             out.append('## Outcome that means "done"')
             out.append("")
-            out.append(q["kpi"])
+            kpi_val = q["kpi"]
+            if isinstance(kpi_val, list):
+                # Structured KPI: list of {name, before, target, status} dicts → bullet list
+                for kp in kpi_val:
+                    if isinstance(kp, dict):
+                        nm = kp.get("name", "")
+                        st = kp.get("status", "")
+                        tgt = kp.get("target", "")
+                        bef = kp.get("before", "")
+                        out.append(f"- {st} **{nm}** — before: {bef} → target: {tgt}".strip())
+                    else:
+                        out.append(f"- {kp}")
+            else:
+                out.append(str(kpi_val))
             out.append("")
 
         # Actions — done first, then todo. Accept dict or string entries.
@@ -413,7 +512,7 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
             out.append("")
 
         lc = q.get("last_commit") or {}
-        if lc.get("sha"):
+        if isinstance(lc, dict) and lc.get("sha"):
             out.append(f"_Last commit: `{lc['sha']}` — {lc.get('msg', '')}_")
 
         return "\n".join(out).rstrip() + "\n"
@@ -447,8 +546,44 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
         q["xp_str"] = f"+{q.get('xp_reward', 25)} XP"
         q["roman"] = roman(q.get("n", 0))
         q["landmark_svg"] = load_landmark(theme, q.get("landmark", "house"))
-        # Position (transform attr) per quest n; defaults to (0,0) if missing
-        q["transform"] = positions.get(str(q.get("n", "")), "translate(0,0)")
+        # Position (transform attr) per quest n; defaults to (0,0) if missing.
+        # For n>9: this is a SIDE QUEST — cluster around its "parent" main pin
+        # (parent_n = ((n-1) % 9) + 1) at a deterministic offset using golden-angle
+        # scatter so each side quest sits in its own constellation slot near the main.
+        n = q.get("n", 0) or 0
+        primary_key = str(n)
+        q["is_main"] = primary_key in positions
+        q["is_side"] = bool(n) and not q["is_main"]
+        if q["is_main"]:
+            q["transform"] = positions[primary_key]
+            q["parent_n"] = None
+            q["side_cx"] = 0
+            q["side_cy"] = 0
+        else:
+            # Side quest. Resolve parent main, scatter around it.
+            parent_n = ((n - 1) % 9) + 1 if n > 9 else None
+            parent_pos = positions.get(str(parent_n) if parent_n else "1", "translate(600,290)")
+            try:
+                px_str, py_str = parent_pos[len("translate("):-1].split(",")
+                px, py = float(px_str.strip()), float(py_str.strip())
+            except Exception:
+                px, py = 600.0, 290.0
+            # Shell index: how many full rotations of 9 sides have we filled?
+            shell = max(0, (n - 10) // 9)
+            slot = (n - 10) % 9
+            import math
+            # Golden-angle distribution — repeatable scatter, looks organic
+            angle = (slot * 137.508 + shell * 73.3) % 360
+            radius = 42 + shell * 16  # 42px first shell, +16px per shell
+            sx = px + radius * math.cos(math.radians(angle))
+            sy = py - 22 + radius * math.sin(math.radians(angle)) * 0.65  # bias above main
+            # Clamp inside canvas (60..420 for y, 40..1160 for x)
+            sx = max(40.0, min(1160.0, sx))
+            sy = max(60.0, min(420.0, sy))
+            q["transform"] = f"translate({sx:.1f},{sy:.1f})"
+            q["parent_n"] = parent_n
+            q["side_cx"] = round(sx, 1)
+            q["side_cy"] = round(sy, 1)
         # next_step shown only if non-empty + status==current
         q["has_next"] = bool(q.get("next_step")) and q.get("status") == "current"
 
@@ -729,9 +864,12 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
                 q["my_todo_editor_href"] = f"vscode://vscode-remote/wsl+{_wsl_distro}{_sc_path}"
             else:
                 q["my_todo_editor_href"] = f"vscode://file/{_sc_path}"
+            # Identifier for the in-browser /api/file/notes/<key> editor endpoint.
+            q["my_todo_quest_key"] = f"{project_id}__{q.get('id', '')}"
         else:
             q["my_todo_file_path"] = ""
             q["my_todo_editor_href"] = ""
+            q["my_todo_quest_key"] = ""
 
         # Build briefing markdown for the Copy-briefing button + .md endpoint.
         # Must run AFTER all normalizations above so it captures the final shape.
@@ -849,6 +987,39 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
             for name, quests_in in chapters.items() if quests_in
         ]
         project["has_chapters"] = bool(project["chapters_list"])
+
+    # Split quests into main (full landmark rendering on the road) and side
+    # (small constellation pins clustered around their parent main). Templates
+    # iterate these separately so the visual hierarchy stays clean even with 70+
+    # quests in OGAS-scale projects.
+    project["main_quests"] = [q for q in quests if q.get("is_main")]
+    project["side_quests"] = [q for q in quests if q.get("is_side")]
+    project["has_side_quests"] = bool(project["side_quests"])
+    project["side_quest_count"] = len(project["side_quests"])
+
+    # Parent/child convenience fields for the quest-log page so sub-quest cards
+    # can show "Belongs to: Quest #N · <Parent Name>" and main-quest cards can
+    # show "Sub-quests: N". Built once from the precomputed main/side split.
+    main_by_n = {m.get("n"): m for m in project["main_quests"]}
+    child_count_by_main_n: dict[int, int] = {}
+    for sq in project["side_quests"]:
+        pn = sq.get("parent_n")
+        if pn is None:
+            continue
+        child_count_by_main_n[pn] = child_count_by_main_n.get(pn, 0) + 1
+        parent = main_by_n.get(pn)
+        if parent:
+            sq["parent_name"] = parent.get("name", "") or parent.get("id", "")
+            sq["parent_id"] = parent.get("id", "")
+            sq["parent_label"] = f"Quest #{pn} · {sq['parent_name']}"
+            sq["has_parent"] = True
+        else:
+            sq["has_parent"] = False
+    for m in project["main_quests"]:
+        cnt = child_count_by_main_n.get(m.get("n"), 0)
+        m["child_count"] = cnt
+        m["has_children"] = cnt > 0
+        m["child_count_plural"] = "" if cnt == 1 else "s"
 
     return project
 

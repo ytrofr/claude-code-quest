@@ -42,9 +42,17 @@ if str(HERE) not in sys.path:
 
 import render as _render  # noqa: E402
 import quest as _quest    # noqa: E402
+import sidecar as _sidecar  # noqa: E402
 
 SITE_DIR = Path.home() / ".claude" / "quest" / "site"
 DATA_PATH = Path.home() / ".claude" / "quest" / "data" / "quests.json"
+BACKLOG_DIR = Path.home() / ".claude" / "quest" / "data" / "backlog"
+NOTES_DIR = Path.home() / ".claude" / "quest" / "data" / "notes"
+
+# File-edit identifier whitelist: lowercase letters, digits, dash, underscore.
+# Used for both <proj> and the <proj>__<quest> sidecar key. Prevents path
+# traversal — no dots, no slashes, no parent refs.
+_FILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_\-]*(__[a-z0-9][a-z0-9_\-]*)?$")
 
 # Single writer lock — tag mutations must not interleave.
 _WRITE_LOCK = threading.Lock()
@@ -74,6 +82,36 @@ def _atomic_write_json(path: Path, data: dict) -> None:
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    tmp.replace(path)
+
+
+def _resolve_edit_path(kind: str, file_id: str) -> Path | None:
+    """Translate `kind` + identifier into an absolute Path under a known root.
+    Returns None if kind is unknown or file_id fails the whitelist (path-traversal guard).
+
+    kind="backlog" + "ogas"          → BACKLOG_DIR / "ogas.md"
+    kind="notes"   + "ogas__some-id" → NOTES_DIR / "ogas__some-id.md"
+    """
+    if not _FILE_ID_RE.match(file_id):
+        return None
+    if kind == "backlog":
+        # backlog ids are bare project ids — must NOT contain "__"
+        if "__" in file_id:
+            return None
+        return BACKLOG_DIR / f"{file_id}.md"
+    if kind == "notes":
+        # notes ids MUST be "<proj>__<quest>"
+        if "__" not in file_id:
+            return None
+        return NOTES_DIR / f"{file_id}.md"
+    return None
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write text atomically: tmp file then rename in place."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 
@@ -181,8 +219,34 @@ class QuestHandler(SimpleHTTPRequestHandler):
         if path == "/api/session":
             self._json(200, self._session_info())
             return
+        # /api/file/<kind>/<id> — read the source markdown for in-browser editor.
+        if path.startswith("/api/file/"):
+            self._handle_file_get(path)
+            return
         # Fall through to static
         super().do_GET()
+
+    def _handle_file_get(self, path: str) -> None:
+        """GET /api/file/<kind>/<file_id> → {ok, content, exists}."""
+        parts = path.split("/")
+        # ['', 'api', 'file', '<kind>', '<id>']  → 5 parts
+        if len(parts) != 5:
+            self._json(400, {"error": "expected /api/file/<kind>/<file_id>"})
+            return
+        kind, file_id = parts[3], parts[4]
+        fp = _resolve_edit_path(kind, file_id)
+        if fp is None:
+            self._json(400, {"error": f"invalid kind or file_id: {kind}/{file_id}"})
+            return
+        if not fp.exists():
+            self._json(200, {"ok": True, "content": "", "exists": False, "path": str(fp)})
+            return
+        try:
+            content = fp.read_text(encoding="utf-8")
+        except OSError as e:
+            self._json(500, {"error": f"read failed: {e}"})
+            return
+        self._json(200, {"ok": True, "content": content, "exists": True, "path": str(fp)})
 
     # -------- POST --------
     def do_POST(self) -> None:  # noqa: N802
@@ -215,8 +279,55 @@ class QuestHandler(SimpleHTTPRequestHandler):
             self._handle_unbind(body)
         elif path == "/api/quest/rename":
             self._handle_rename(body)
+        elif path.startswith("/api/file/"):
+            self._handle_file_post(path, body)
         else:
             self._json(404, {"error": "unknown endpoint"})
+
+    def _handle_file_post(self, path: str, body: dict) -> None:
+        """POST /api/file/<kind>/<file_id> {content} → write file, re-render, return."""
+        parts = path.split("/")
+        if len(parts) != 5:
+            self._json(400, {"error": "expected /api/file/<kind>/<file_id>"})
+            return
+        kind, file_id = parts[3], parts[4]
+        fp = _resolve_edit_path(kind, file_id)
+        if fp is None:
+            self._json(400, {"error": f"invalid kind or file_id: {kind}/{file_id}"})
+            return
+        content = body.get("content")
+        if not isinstance(content, str):
+            self._json(400, {"error": "body.content must be a string"})
+            return
+        # 1MB hard cap — keeps a typo'd paste from filling disk
+        if len(content.encode("utf-8")) > 1_000_000:
+            self._json(413, {"error": "content too large (max 1MB)"})
+            return
+        with _WRITE_LOCK:
+            try:
+                _atomic_write_text(fp, content)
+            except OSError as e:
+                self._json(500, {"error": f"write failed: {e}"})
+                return
+            # Trigger re-render so the next page load reflects the edit.
+            # Failure is non-fatal — file IS written, render can be retried.
+            render_ok = True
+            render_err = ""
+            try:
+                _render.render_all()
+            except Exception as e:  # noqa: BLE001
+                render_ok = False
+                render_err = str(e)
+                sys.stderr.write(f"[server] render after file edit failed: {e}\n")
+        self._json(200, {
+            "ok": True,
+            "kind": kind,
+            "file_id": file_id,
+            "path": str(fp),
+            "bytes": len(content.encode("utf-8")),
+            "render_ok": render_ok,
+            "render_err": render_err,
+        })
 
     # -------- handlers --------
     def _handle_tag_add(self, body: dict) -> None:

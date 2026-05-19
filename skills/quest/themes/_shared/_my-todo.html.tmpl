@@ -21,9 +21,9 @@
       <h3 class="qd-tasks-title">My To-Do</h3>
       <span class="qd-tasks-count">{{my_todo_done}} / {{my_todo_total}}</span>
       {{#if my_todo_next}}<span class="qd-tasks-summary-preview">Next: {{{my_todo_next_html}}}</span>{{/if}}
-      {{#if my_todo_editor_href}}
-      <a class="qd-my-todo-edit" href="{{my_todo_editor_href}}" title="Open sidecar in VS Code / Cursor / Windsurf"
-         onclick="event.stopPropagation();">✎ Edit in editor</a>
+      {{#if my_todo_quest_key}}
+      <button type="button" class="qd-my-todo-edit" title="Edit My To-Do here in the browser"
+              onclick="event.stopPropagation(); window.openQuestEditor &amp;&amp; window.openQuestEditor('notes', '{{my_todo_quest_key}}', 'My To-Do · {{active.name}}');">✎ Edit</button>
       {{/if}}
     </summary>
     {{#if my_todo_total}}
@@ -51,10 +51,11 @@
     <span class="qd-tasks-summary-arrow" aria-hidden="true">▸</span>
     <h3 class="qd-tasks-title">My To-Do</h3>
     <span class="qd-actions-empty-badge">none yet</span>
-    {{#if my_todo_editor_href}}
-    <a class="qd-my-todo-edit" href="{{my_todo_editor_href}}" title="Create &amp; open sidecar in VS Code / Cursor">✎ Open in editor</a>
+    {{#if my_todo_quest_key}}
+    <button type="button" class="qd-my-todo-edit" title="Create &amp; edit My To-Do here in the browser"
+            onclick="window.openQuestEditor &amp;&amp; window.openQuestEditor('notes', '{{my_todo_quest_key}}', 'My To-Do · {{active.name}}');">✎ Start jotting</button>
     {{/if}}
   </div>
-  <p class="qd-actions-empty-hint">Your space — jot tasks &amp; notes for this quest. Add one with <code>/quest todo add &lt;proj&gt; &lt;quest&gt; "..."</code>, or open the file with <code>/quest todo edit &lt;proj&gt; &lt;quest&gt;</code>.</p>
+  <p class="qd-actions-empty-hint">Your space — jot tasks &amp; notes for this quest. Click <strong>Start jotting</strong> above to open the in-browser editor.</p>
 </section>
 {{/if}}
