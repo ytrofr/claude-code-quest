@@ -2,6 +2,32 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.12.0] — 2026-05-19
+
+In-browser markdown editor for My To-Do sidecars and per-project Wishlist Tray — backlog of mission ideas pinned above the quest map, scribble freely, save without leaving the page.
+
+### Added
+
+- **Wishlist Tray on every project map.** Drop a `~/.claude/quest/data/backlog/<proj>.md` file with `- [ ]` lines (optional `Why:` / `Effort:` / `Tag:` sub-bullets) and a parchment tray renders at the top of the project map listing all unchecked ideas. Counts split into `<n> ready · <n> sparse` (sparse = no Why/Effort, will need clarification at promotion time). `{{#if has_backlog}}` gated — projects without a backlog file render unchanged.
+- **In-browser edit modal for My To-Do + backlog.** Click `✎ Edit` on any quest's My To-Do section or the wishlist tray and a parchment modal opens with the file contents in a markdown textarea. `Tab` indents, `Ctrl/Cmd+S` saves, `Esc` cancels (with unsaved-change confirm). Save POSTs to the new file endpoint, server writes atomically, renderer re-runs, page reloads with fresh content. Never leave localhost.
+- **Pre-fill template for new files.** Opening the editor on an empty/new file seeds the canonical structure (`## Todos\n\n- [ ] \n\n## Notes\n\n` for sidecars; `# Backlog\n\n- [ ] ` for backlogs) and lands the cursor after the first checkbox marker. Removes the silent-empty-save trap where bare text would round-trip to disk but never render.
+- **Auto-wrap on save for unstructured text.** When the editor's textarea contains bare prose with no `- [ ]` or `## Notes` markers, the save call silently prepends `## Notes\n\n` (for sidecars) or `# Backlog\n\n- [ ]` (for backlog ideas) before writing — so whatever the user types renders correctly on the card. Already-structured content passes through unchanged.
+- **Load-time format warning.** When the editor loads a file that has saved content but doesn't match the expected format, a red warning at the top of the modal tells the user exactly how to fix it.
+
+### Endpoints
+
+- **`GET /api/file/<kind>/<file_id>`** — returns the source markdown for `kind ∈ {backlog, notes}`. Backlog ids are bare project ids; notes ids are `<proj>__<quest>` sidecar keys. Path traversal blocked via whitelist (`^[a-z0-9][a-z0-9_\-]*(__[a-z0-9][a-z0-9_\-]*)?$`).
+- **`POST /api/file/<kind>/<file_id>`** — body `{content: string}` writes file atomically + triggers `render_all()` + returns `{ok, render_ok}`. 1MB body cap. Empty `content` writes an empty file (lets users wipe state cleanly).
+
+### Changed
+
+- **My To-Do `✎ Edit` button** now opens the in-browser modal instead of the `vscode://file/...` deeplink. The old deeplink path was flaky on WSL2 (Windows registry hand-off, path translation), forced a context switch out of the browser, and required Cursor/VS Code/Windsurf to be running. The new path stays on localhost.
+- **Empty-state My To-Do** button label changed from `✎ Open in editor` to `✎ Start jotting`, and the hint now points to the in-browser editor instead of the `/quest todo` CLI.
+
+### Fixed
+
+- **`_build_briefing_md` crash on structured-KPI lists.** Quests with `kpi` stored as `[{name, before, target, status}, …]` (instead of a string) used to crash `render_all()` with `TypeError: sequence item N: expected str instance, list found`. The builder now renders structured KPIs as a bullet list with status / before / target.
+
 ## [1.11.0] — 2026-05-17
 
 In-card theme switching (default + cartoon solar systems + Pokemon worldmap), quest title rename across all three views, URL-paste auto-rebind hook.
