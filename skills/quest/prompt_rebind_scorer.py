@@ -36,10 +36,10 @@ DATA_FILE = QUEST_ROOT / "data" / "quests.json"
 CONFIG_FILE = QUEST_ROOT / "config.json"
 
 REBIND_SCORE = 5.0
-REBIND_MARGIN = 5.0       # RC1: raised 3->5 — blocks low-margin user-alone noise rebinds
+REBIND_MARGIN = 5.0       # min top-minus-runner gap for a user-alone rebind
 SUGGEST_SCORE = 3.0
 USER_WEIGHT = 5.0
-CONFLICT_OVERRIDE_FRAC = 0.4  # RC2: joined-top must dominate >=40% of total to override conflict guard
+MIN_REBIND_TOKENS = 2     # a rebind needs >=N distinct prompt tokens matching the target quest
 TRANSCRIPT_TAIL_BYTES = 200_000  # cap I/O on huge transcripts
 TRANSCRIPT_SCAN_LINES = 50       # only scan last N lines for assistant msg
 
@@ -207,13 +207,15 @@ def _build_idf(quests: list[dict]) -> tuple[list[tuple[str, set[str]]], dict[str
 
 
 def decide_action(prompt: str, prior_context: str, docs, idf):
-    """Two-stage decision with conflict guard.
+    """Two-stage decision — only the user's own prompt can rebind.
 
-    1. Score user prompt alone (weight=USER_WEIGHT).
-    2. If user-alone exceeds rebind threshold → rebind on user-top.
-    3. Else score joined (user + prior_context).
-    4. If user-top != joined-top AND user has SOME signal → suggest, not rebind.
-    5. Else apply normal thresholds to joined score.
+    1. Score the user prompt alone. If it strongly + unambiguously matches one
+       quest (score/margin floors AND >=MIN_REBIND_TOKENS distinct matched
+       tokens) → rebind.
+    2. Otherwise score joined (user prompt + prior assistant context). The
+       joined result can only SUGGEST — prior context never auto-rewrites the
+       claim. Context-driven rebind was the source of rampant claim drift.
+    3. noop when even the joined score is below the suggest floor.
 
     Returns dict: {action, top, score, margin, runner, path, p_score, c_score}.
     """
@@ -226,7 +228,14 @@ def decide_action(prompt: str, prior_context: str, docs, idf):
         u_top, u_score = scored[0]
         u_runner = scored[1][1] if len(scored) > 1 else 0
         u_margin = u_score - u_runner
-        if u_score >= REBIND_SCORE and u_margin >= REBIND_MARGIN:
+        # Count distinct prompt tokens that actually matched the winning quest.
+        # A rebind requires the USER PROMPT ITSELF to carry real, specific
+        # signal — >=MIN_REBIND_TOKENS shared tokens — not one generic word
+        # clearing the score floor.
+        _u_top_tok = next((qt for qid, qt in docs if qid == u_top), set())
+        u_match = len(p_tok & _u_top_tok)
+        if (u_score >= REBIND_SCORE and u_margin >= REBIND_MARGIN
+                and u_match >= MIN_REBIND_TOKENS):
             return {
                 "action": "rebind", "top": u_top, "score": round(u_score, 2),
                 "margin": round(u_margin, 2), "runner": scored[1][0] if len(scored) > 1 else None,
@@ -251,22 +260,9 @@ def decide_action(prompt: str, prior_context: str, docs, idf):
     j_runner = scored_joined[1] if len(scored_joined) > 1 else ("-", 0, 0, 0)
     j_margin = j_total - j_runner[1]
 
-    # Conflict guard: user-prompt signals a DIFFERENT quest than joined picks
+    # Conflict guard: user-prompt leans toward a different quest than the
+    # joined score picks → suggest j_top (never rebind).
     if u_top and j_top != u_top and u_score >= SUGGEST_SCORE:
-        # RC2: if joined-top overwhelmingly dominates the field AND the user's
-        # own prompt signal is weak (below the rebind floor), the context is
-        # decisive — rebind despite the conflict instead of only suggesting.
-        # Scale-free: margin gated as a fraction of total, not an absolute
-        # score, so it holds across corpora of any size.
-        if (j_total > 0 and j_margin >= CONFLICT_OVERRIDE_FRAC * j_total
-                and u_score < REBIND_SCORE):
-            return {
-                "action": "rebind", "top": j_top, "score": round(j_total, 2),
-                "margin": round(j_margin, 2), "runner": j_runner[0],
-                "path": "conflict-override", "p_score": round(j_p, 2),
-                "c_score": round(j_c, 2), "user_top": u_top,
-                "user_score": round(u_score, 2),
-            }
         return {
             "action": "suggest", "top": j_top, "score": round(j_total, 2),
             "margin": round(j_margin, 2), "runner": j_runner[0],
@@ -274,17 +270,15 @@ def decide_action(prompt: str, prior_context: str, docs, idf):
             "user_top": u_top, "user_score": round(u_score, 2),
         }
 
-    if j_total >= REBIND_SCORE and j_margin >= REBIND_MARGIN:
-        return {
-            "action": "rebind", "top": j_top, "score": round(j_total, 2),
-            "margin": round(j_margin, 2), "runner": j_runner[0],
-            "path": "joined", "p_score": round(j_p, 2), "c_score": round(j_c, 2),
-        }
+    # Stage 2 is SUGGEST-only. Prior conversation context must never auto-
+    # rewrite the claim — context tokens dominate j_total and would rebind to
+    # whatever the session was last discussing (the rampant claim-drift bug).
+    # Only Stage 1, the user's own current prompt, can rebind.
     if j_total >= SUGGEST_SCORE:
         return {
             "action": "suggest", "top": j_top, "score": round(j_total, 2),
             "margin": round(j_margin, 2), "runner": j_runner[0],
-            "path": "joined-weak", "p_score": round(j_p, 2), "c_score": round(j_c, 2),
+            "path": "joined", "p_score": round(j_p, 2), "c_score": round(j_c, 2),
         }
     return {"action": "noop", "top": j_top, "score": round(j_total, 2),
             "margin": round(j_margin, 2), "runner": j_runner[0],
