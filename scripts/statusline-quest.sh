@@ -117,55 +117,8 @@ quest_indicator() {
     fi
   fi
 
-  # Sustained-drift discard (T5): when the session-name canary mismatch has
-  # persisted beyond QUEST_MISMATCH_DISCARD_SEC, the Tier-1 claim is almost
-  # certainly stale — discard it AND skip Tier-2 auto-detect, so the statusline
-  # shows "⚠ <project>/-" (honest "claim wrong, real quest unknown") rather
-  # than a confidently-wrong quest. A timestamp file tracks first-seen
-  # mismatch; a brief mismatch (one tick, oddly-named session) never trips it.
-  # Honors the URL-autoclaim canary-suppression sentinel. Disable with
-  # QUEST_MISMATCH_DISCARD_SEC=0.
-  local _drift_discard=0
-  local _discard_sec="${QUEST_MISMATCH_DISCARD_SEC:-1800}"
-  if [ -n "$sk" ] && [ -n "$project" ] && [ -n "$qid" ] \
-     && [ "$_discard_sec" -gt 0 ] 2>/dev/null; then
-    local _sn_slug=""
-    [ -n "$session_name" ] && _sn_slug=$(_qd_kebab "$session_name")
-    local _mismatch=0
-    if [ -n "$_sn_slug" ] && [ "$_sn_slug" != "$qid" ]; then
-      case "$qid" in
-        *"$_sn_slug"*) ;;
-        *) case "$_sn_slug" in
-             *"$qid"*) ;;
-             *) _mismatch=1 ;;
-           esac ;;
-      esac
-    fi
-    local _ms_file="$run_dir/session-$sk.quest-mismatch-since"
-    local _canary2="$run_dir/session-$sk.canary-suppressed-until"
-    local _now2; _now2=$(date +%s)
-    if [ -r "$_canary2" ]; then
-      local _cu; _cu=$(head -c 32 "$_canary2" 2>/dev/null | tr -d '\r\n')
-      [ -n "$_cu" ] && [ "$_cu" -gt "$_now2" ] 2>/dev/null && _mismatch=0
-    fi
-    if [ "$_mismatch" = "1" ]; then
-      local _since=""
-      [ -r "$_ms_file" ] && _since=$(head -c 32 "$_ms_file" 2>/dev/null | tr -d '\r\n')
-      if [ -z "$_since" ] || ! [ "$_since" -gt 0 ] 2>/dev/null; then
-        printf '%s\n' "$_now2" > "$_ms_file" 2>/dev/null
-      elif [ "$((_now2 - _since))" -ge "$_discard_sec" ]; then
-        qid=""            # sustained drift — discard stale claim
-        _drift_discard=1
-      fi
-    else
-      rm -f "$_ms_file" 2>/dev/null
-    fi
-  fi
-
-  # If we have a project but no qid, try most-recent-current quest. Skipped
-  # when the qid was discarded for sustained drift — D2: show "<project>/-",
-  # never auto-pick another (likely also-wrong) quest.
-  if [ -n "$project" ] && [ -z "$qid" ] && [ "$_drift_discard" != "1" ] && [ -r "$data" ]; then
+  # If we have a project but no qid, try most-recent-current quest
+  if [ -n "$project" ] && [ -z "$qid" ] && [ -r "$data" ]; then
     qid=$(jq -r --arg p "$project" '
       .projects[$p].quests // [] |
       map(select(.status == "current")) |
@@ -230,10 +183,7 @@ quest_indicator() {
     url="$dashboard/$project/"
     base="$project/-"
     [ -n "$sname_slug" ] && suffix=" · $sname_slug"
-    # Sustained-drift discard surfaces the ⚠ glyph here (qid was nulled above).
-    local _drift_prefix=""
-    [ "$_drift_discard" = "1" ] && _drift_prefix="⚠ "
-    tag="${_drift_prefix}${base}${suffix}"
+    tag="${base}${suffix}"
   else
     url="$dashboard/"
     base="-"

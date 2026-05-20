@@ -2,6 +2,15 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.13.1] — 2026-05-20
+
+Fix release. v1.13.0's prompt-rebind changes plus a new statusline behavior combined into a regression where every session's statusline collapsed to the project homepage. Both causes fixed.
+
+### Fixed
+
+- **Prompt-rebind scorer no longer drifts claims from conversation context.** The scorer's "joined" path auto-rewrote a session's quest claim on nearly every prompt, scoring the *prior conversation context* heavily — so a session deep in one quest's work would silently rebind to whatever it had been discussing, regardless of what the user actually typed. A session could thrash between three or four quests in an afternoon. Now **only the user's own current prompt can trigger a rebind**, and only when it strongly and unambiguously matches one quest (score + margin floors *and* at least 2 distinct matched tokens). Prior context can only raise a `[quest-hint]` suggestion — it never rewrites the claim. Explicit `/quest claim` and plan-card URL paste are unchanged.
+- **Statusline no longer blanks a drifted claim to `⚠ <project>/-`.** v1.13.0 added a "sustained-drift discard" that, once a session's name had mismatched its claimed quest for 30 minutes, replaced the quest with a bare `⚠ <project>/-` homepage marker. Because claim drift was rampant (see above), this fired across every session at once. Reverted — the statusline shows the claimed quest again, and the drift is fixed at its source instead.
+
 ## [1.13.0] — 2026-05-20
 
 Prompt-rebind scorer hardening — stops sessions drifting onto the wrong quest — plus a third map theme and a statusline that fails honest instead of confidently-wrong.

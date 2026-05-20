@@ -135,13 +135,17 @@ class TestDecideAction(unittest.TestCase):
         self.assertEqual(r["top"], "mobile-layout-iframe-cache")
         self.assertEqual(r["path"], "user-alone")
 
-    def test_generic_continuation_falls_through_to_joined(self):
+    def test_generic_continuation_suggests_not_rebinds(self):
+        # A contentless continuation ("yes lets do it") with prior context
+        # about a quest is now a SUGGEST, not an auto-rebind. Prior context
+        # must never rewrite the claim — only the user's own strong prompt
+        # (Stage 1) can rebind. This was the rampant claim-drift bug.
         r = scorer.decide_action(
             "yes lets do it",
             "I propose investigating the dorian investors landing page layout",
             self.docs, self.idf,
         )
-        self.assertEqual(r["action"], "rebind")
+        self.assertEqual(r["action"], "suggest")
         self.assertEqual(r["top"], "dorian-investors-landing")
         self.assertEqual(r["path"], "joined")
 
@@ -179,22 +183,24 @@ class TestDecideAction(unittest.TestCase):
         # user-alone path. Regression guard on the constant.
         self.assertGreaterEqual(scorer.REBIND_MARGIN, 5.0)
 
-    def test_rc2_dominant_context_overrides_conflict_guard(self):
-        # RC2: user prompt weakly signals quest A, but joined context
-        # overwhelmingly dominates toward B -> rebind to B (not suggest-only).
-        # Crafted docs/idf for scale-independent precision (nonsense tokens).
-        docs = [
-            ("qa", {"quaffle"}),
-            ("qb", {"nargle", "thestral", "bowtruckle", "wrackspurt"}),
-        ]
-        idf = {"quaffle": 4.0, "nargle": 9.0, "thestral": 9.0,
-               "bowtruckle": 9.0, "wrackspurt": 9.0}
+    def test_single_token_match_does_not_rebind(self):
+        # A prompt sharing only ONE distinct token with the top quest is too
+        # weak to rebind even if it clears the score/margin floors —
+        # MIN_REBIND_TOKENS gate. Crafted docs/idf for precision.
+        docs = [("qa", {"quaffle"}), ("qb", {"nargle"})]
+        idf = {"quaffle": 20.0, "nargle": 1.0}
+        r = scorer.decide_action("quaffle", "", docs, idf)
+        self.assertNotEqual(r["action"], "rebind")
+
+    def test_joined_context_alone_never_rebinds(self):
+        # Strong prior context, no real user-prompt signal → suggest at most,
+        # never rebind. Prior context must not auto-rewrite the claim.
         r = scorer.decide_action(
-            "quaffle", "nargle thestral bowtruckle wrackspurt", docs, idf,
+            "ok",
+            "Heavy ongoing work on mobile layout iframe cache viewport regression",
+            self.docs, self.idf,
         )
-        self.assertEqual(r["action"], "rebind")
-        self.assertEqual(r["top"], "qb")
-        self.assertEqual(r["path"], "conflict-override")
+        self.assertNotEqual(r["action"], "rebind")
 
     def test_locked_and_done_quests_never_picked(self):
         # The fixture has a "locked-old-feature" and "done-old-quest" — neither
