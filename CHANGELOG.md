@@ -2,6 +2,24 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.13.0] — 2026-05-20
+
+Prompt-rebind scorer hardening — stops sessions drifting onto the wrong quest — plus a third map theme and a statusline that fails honest instead of confidently-wrong.
+
+### Added
+
+- **Worldmap theme.** A third built-in theme alongside Pokémon and Storybook — an old-cartography look (parchment, hand-drawn coastlines, compass rose). Switch with `/quest theme <project> worldmap`.
+
+### Changed
+
+- **Prompt-rebind scorer no longer mis-rebinds on weak signal.** `REBIND_MARGIN` raised 3→5: a prompt that only weakly out-scores the runner-up quest (the kind of one-or-two-shared-token noise that used to silently switch your claim) now stays put. Genuine strong rebinds are unaffected.
+- **Conflict-guard can now self-correct.** When a session's accumulated context overwhelmingly points at one quest but the latest prompt is ambiguous, the scorer now *rebinds* to the dominant quest instead of only emitting an advisory hint. Previously a wrong claim could persist for days because every high-confidence correction was downgraded to a suggestion. The override is scale-free (gated on the winning quest dominating ≥40% of the total score, not an absolute threshold).
+- **Subagent task-notification blobs no longer drive rebinds.** `<task-notification>` messages — injected by the harness when a subagent finishes, not typed by the user — are now skipped by the scorer instead of being scored as if they were user intent.
+
+### Fixed
+
+- **Statusline shows `⚠ <project>/-` instead of a confidently-wrong quest.** When a session's name has mismatched its claimed quest for a sustained period (default 30 min; `QUEST_MISMATCH_DISCARD_SEC`), the statusline now discards the stale claim and shows an explicit "claim is wrong, real quest unknown" marker rather than continuing to display a quest the session almost certainly isn't on.
+
 ## [1.12.0] — 2026-05-19
 
 In-browser markdown editor for My To-Do sidecars and per-project Wishlist Tray — backlog of mission ideas pinned above the quest map, scribble freely, save without leaving the page.

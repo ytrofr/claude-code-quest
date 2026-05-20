@@ -36,9 +36,10 @@ DATA_FILE = QUEST_ROOT / "data" / "quests.json"
 CONFIG_FILE = QUEST_ROOT / "config.json"
 
 REBIND_SCORE = 5.0
-REBIND_MARGIN = 3.0
+REBIND_MARGIN = 5.0       # RC1: raised 3->5 — blocks low-margin user-alone noise rebinds
 SUGGEST_SCORE = 3.0
 USER_WEIGHT = 5.0
+CONFLICT_OVERRIDE_FRAC = 0.4  # RC2: joined-top must dominate >=40% of total to override conflict guard
 TRANSCRIPT_TAIL_BYTES = 200_000  # cap I/O on huge transcripts
 TRANSCRIPT_SCAN_LINES = 50       # only scan last N lines for assistant msg
 
@@ -252,6 +253,20 @@ def decide_action(prompt: str, prior_context: str, docs, idf):
 
     # Conflict guard: user-prompt signals a DIFFERENT quest than joined picks
     if u_top and j_top != u_top and u_score >= SUGGEST_SCORE:
+        # RC2: if joined-top overwhelmingly dominates the field AND the user's
+        # own prompt signal is weak (below the rebind floor), the context is
+        # decisive — rebind despite the conflict instead of only suggesting.
+        # Scale-free: margin gated as a fraction of total, not an absolute
+        # score, so it holds across corpora of any size.
+        if (j_total > 0 and j_margin >= CONFLICT_OVERRIDE_FRAC * j_total
+                and u_score < REBIND_SCORE):
+            return {
+                "action": "rebind", "top": j_top, "score": round(j_total, 2),
+                "margin": round(j_margin, 2), "runner": j_runner[0],
+                "path": "conflict-override", "p_score": round(j_p, 2),
+                "c_score": round(j_c, 2), "user_top": u_top,
+                "user_score": round(u_score, 2),
+            }
         return {
             "action": "suggest", "top": j_top, "score": round(j_total, 2),
             "margin": round(j_margin, 2), "runner": j_runner[0],
@@ -293,6 +308,13 @@ def run_from_stdin() -> int:
     if not sk:
         _log({"ts": _ts(), "sk": "", "action": "skip", "acted": "no-sk",
               "prompt": prompt[:80]})
+        return 0
+
+    # RC4: <task-notification> blobs are harness-injected subagent completion
+    # messages, not user intent — they must never drive a quest rebind.
+    if prompt.startswith("<task-notification>"):
+        _log({"ts": _ts(), "sk": sk, "action": "skip",
+              "acted": "skipped_task_notification", "prompt": prompt[:80]})
         return 0
 
     # URL-lock sentinel check: when ~/.claude/hooks/quest-url-rebind.sh just

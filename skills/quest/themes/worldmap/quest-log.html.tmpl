@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{name}} — Quest Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Fredoka', system-ui, sans-serif; background: #5db4d8; padding: 18px; }
+  .frame { max-width: 1280px; margin: 0 auto; background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 30px rgba(20,40,60,0.4); }
+  .head { padding: 14px 22px; background: linear-gradient(180deg, #fff 0%, #f7eed8 100%); border-bottom: 4px solid #2a3a4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .title { display: flex; align-items: center; gap: 12px; }
+  .badge { width: 50px; height: 50px; background: #ffd24a; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; color: #2a3a4a; box-shadow: 0 3px 0 #c9a020; line-height: 1; }
+  h1 { margin: 0; font-weight: 700; font-size: 26px; color: #2a3a4a; line-height: 1.1; }
+  .sub { font-weight: 500; font-size: 14px; color: #6a7a8a; margin-top: 2px; }
+  .nav { display: flex; gap: 6px; margin: 0 8px; align-items: center; }
+  .nav a { padding: 8px 14px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; font-weight: 700; font-size: 13px; color: #2a3a4a; text-decoration: none; letter-spacing: 1px; text-transform: uppercase; }
+  .nav a.active { background: #2a3a4a; color: #ffd24a; }
+  .qd-back-link { padding: 6px 12px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; text-decoration: none; font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 3px 0 #c9a020; }
+  .qd-back-link:hover { transform: translateY(1px); box-shadow: 0 2px 0 #c9a020; }
+  .xp-block { display: flex; align-items: center; gap: 12px; }
+  .xp-bar { width: 200px; height: 18px; background: #f0e4cc; border: 3px solid #2a3a4a; border-radius: 10px; overflow: hidden; position: relative; }
+  .xp-fill { height: 100%; background: linear-gradient(180deg, #ffd24a 0%, #d4a020 100%); }
+  .xp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #2a3a4a; }
+  .filters { display: flex; gap: 10px; padding: 14px 22px; background: #f7eed8; border-bottom: 3px solid #2a3a4a; flex-wrap: wrap; align-items: center; }
+  .filt { padding: 6px 14px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 14px; font-weight: 700; font-size: 13px; color: #2a3a4a; letter-spacing: 0.5px; cursor: pointer; font-family: inherit; transition: transform 0.1s ease; }
+  .filt:hover { transform: translateY(-1px); box-shadow: 0 3px 0 #2a3a4a; }
+  .filt:focus-visible { outline: 3px solid #ff6a3a; outline-offset: 2px; }
+  .filt.on { background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 3px 0 #5a1818; }
+  .filt .count { display: inline-block; margin-left: 4px; padding: 1px 6px; background: rgba(0,0,0,0.12); border-radius: 8px; font-size: 11px; }
+  .filt.on .count { background: rgba(255,255,255,0.25); }
+  /* Multi-select status filter — body classes toggled by JS, persisted in localStorage */
+  body.hide-current .card.current { display: none; }
+  body.hide-done    .card.done    { display: none; }
+  body.hide-locked  .card.locked  { display: none; }
+  /* Main/Sub kind filter */
+  body.hide-kind-side .card.is-side { display: none; }
+  body.hide-kind-main .card[data-quest-kind="main"] { display: none; }
+  .filt.on { background: #2a3a4a; color: #ffd24a; }
+  .filt .count { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+  .filt.on .count { background: #ffd24a; color: #2a3a4a; }
+  /* Off-state pills look "scrolled-up", muted but still readable */
+  .filt[data-status] .icon { display: inline-block; margin-right: 4px; opacity: 0.85; }
+  .filt[data-status]:not(.on) { background: #f0e4cc; color: #8a8a8a; border-style: dashed; box-shadow: none; opacity: 0.7; }
+  .filt[data-status]:not(.on) .icon { opacity: 0.4; }
+  .filt-sep { color: #8a7a6a; padding: 0 2px; user-select: none; align-self: center; }
+  .filt-action { font-size: 11px; padding: 5px 10px; background: #fffdf2; }
+  .filt-action:hover { background: #f7eed8; }
+  .grid { padding: 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; background: #fffdf2; }
+  .card { background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 14px; overflow: hidden; box-shadow: 0 5px 0 #2a3a4a; transition: transform .15s; cursor: pointer; position: relative; }
+  .card:hover { transform: translateY(-3px); }
+  .card.done { border-color: #2e6a2a; box-shadow: 0 5px 0 #2e6a2a; }
+  .card.current { border-color: #5a1818; box-shadow: 0 5px 0 #5a1818; }
+  .card.locked { opacity: 0.7; }
+  /* Sub-quest cards get a corner ribbon and dashed accent so they're easy to scan in the grid. */
+  .card.is-side { border-style: dashed; border-width: 3px; box-shadow: 0 3px 0 #2a3a4a; }
+  .card.is-side::before { content: 'SUB'; position: absolute; top: 8px; right: 8px; background: #f0e4cc; color: #6a4828; font-weight: 700; font-size: 10px; letter-spacing: 2px; padding: 3px 8px; border: 1.5px solid #c9a020; border-radius: 6px; z-index: 3; pointer-events: none; }
+  .card.is-main-with-children::before { content: 'MAIN'; position: absolute; top: 8px; right: 8px; background: #ffd24a; color: #6a4828; font-weight: 700; font-size: 10px; letter-spacing: 2px; padding: 3px 8px; border: 2px solid #c9a020; border-radius: 6px; z-index: 3; pointer-events: none; box-shadow: 0 2px 0 #c9a020; }
+  /* Parent/child relationship chip — same family of pills as tag chips */
+  .qd-conn-row { margin: 6px 0 8px; }
+  .qd-conn-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; font-family: 'Fredoka', sans-serif; font-size: 11px; font-weight: 600; line-height: 1.2; text-decoration: none; max-width: 100%; }
+  .qd-conn-chip-parent { background: #f7eed8; border: 1.5px dashed #c9a020; color: #6a4828; cursor: pointer; }
+  .qd-conn-chip-parent:hover { background: #ffd24a; color: #2a3a4a; }
+  .qd-conn-chip-parent:focus { outline: 2px solid #c9a020; outline-offset: 2px; }
+  .qd-conn-chip-parent b { color: #2a3a4a; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .qd-conn-chip-main { background: #e8f0d8; border: 1.5px solid #5e9a4a; color: #2e6a2a; }
+  .qd-conn-chip-main b { font-weight: 700; font-size: 13px; color: #2e6a2a; }
+  .qd-conn-arrow { font-weight: 900; font-size: 13px; }
+  .qd-conn-label { color: inherit; opacity: 0.85; }
+  /* Filter toolbar now also lets you toggle main-vs-side visibility. Added via JS button. */
+  .filt-kind { background: #fff; border: 2.5px solid #2a3a4a; padding: 6px 12px; border-radius: 8px; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 12px; cursor: pointer; color: #2a3a4a; letter-spacing: 0.5px; }
+  .filt-kind.on { background: #2a3a4a; color: #ffd24a; }
+  .illus { height: 150px; position: relative; border-bottom: 3px solid #2a3a4a; overflow: hidden; background: linear-gradient(180deg, #bbe4f5 0%, #bbe4f5 28%, #8fc97a 28%); }
+  .card.locked .illus { background: linear-gradient(180deg, #d4d4d4 0%, #d4d4d4 28%, #b0b0b0 28%); }
+  .illus svg { width: 100%; height: 100%; display: block; }
+  .num-badge { position: absolute; top: 8px; left: 8px; width: 36px; height: 36px; background: #fffdf2; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; color: #2a3a4a; line-height: 1; box-shadow: 0 2px 0 #2a3a4a; z-index: 2; }
+  .card.done .num-badge { background: #5e9a4a; color: #fff; border-color: #2e6a2a; box-shadow: 0 2px 0 #2e6a2a; }
+  .card.current .num-badge { background: #ff6a3a; color: #fff; border-color: #5a1818; box-shadow: 0 2px 0 #5a1818; }
+  .stat-pill { position: absolute; top: 8px; right: 8px; padding: 5px 10px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 12px; font-weight: 700; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: #2a3a4a; z-index: 2; }
+  .card.done .stat-pill { background: #5e9a4a; color: #fff; border-color: #2e6a2a; }
+  .card.current .stat-pill { background: #ff6a3a; color: #fff; border-color: #5a1818; }
+  .body { padding: 14px 16px 16px; }
+  .qname { margin: 0 0 4px; font-weight: 700; font-size: 18px; color: #2a3a4a; }
+  .qdesc { margin: 0 0 12px; font-weight: 500; font-size: 14px; color: #5a6a7a; line-height: 1.4; min-height: 36px; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tag { padding: 4px 9px; background: #ffd24a; border: 2px solid #2a3a4a; border-radius: 8px; font-weight: 700; font-size: 12px; color: #2a3a4a; line-height: 1; }
+  .tag.plan { background: #fffdf2; font-weight: 600; }
+  .tag.locked { background: #d4d4d4; color: #5a5a5a; border-color: #5a5a5a; }
+  .prog { margin-top: 12px; padding: 10px 12px; background: rgba(255,106,58,0.08); border: 2px dashed #ff6a3a; border-radius: 8px; }
+  .prog-row { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; color: #5a1818; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .prog-bar { height: 10px; background: #fffdf2; border: 2px solid #5a1818; border-radius: 6px; overflow: hidden; }
+  .prog-fill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); }
+  .prog-next { margin-top: 8px; font-size: 13px; color: #5a1818; font-weight: 600; line-height: 1.4; }
+  .done-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 12px; background: rgba(94,154,74,0.08); border: 2px solid #5e9a4a; border-radius: 8px; font-weight: 700; font-size: 13px; color: #2e6a2a; }
+  .done-row svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .lock-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 12px; background: #f0f0f0; border: 2px dashed #999; border-radius: 8px; font-weight: 600; font-size: 13px; color: #5a5a5a; }
+  .lock-row svg { width: 16px; height: 16px; flex-shrink: 0; }
+  /* status-toggled blocks */
+  .row-done, .row-current, .row-locked { display: none; }
+  .card.done .row-done { display: flex; }
+  .card.current .row-current { display: block; }
+  .card.locked .row-locked { display: flex; }
+  .qd-dep-blocked { padding: 6px 10px; margin-top: 6px; background: #f7eed8; border: 2px dashed #c0a878; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6a4828; }
+  .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; }
+  .qd-live-claims { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 10px; background: rgba(91,180,216,0.10); border: 2px solid #5a8aa0; border-radius: 8px; }
+  .qd-live-claims-label { font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: #2a5a8a; text-transform: uppercase; padding-right: 4px; border-right: 1px dashed #5a8aa0; }
+  .qd-live-claim-pill { padding: 2px 8px; background: #fffdf2; border: 2px solid #5a8aa0; border-radius: 12px; font-weight: 600; font-size: 12px; color: #2a5a8a; }
+
+  /* Search bar — lives in the filters row */
+  .qd-search { position: relative; flex: 1; min-width: 240px; max-width: 480px; }
+  .qd-search input { width: 100%; padding: 8px 36px 8px 36px; border-radius: 12px; border: 2.5px solid #2a3a4a; background: #fffdf2; font-family: inherit; font-size: 14px; font-weight: 600; color: #2a3a4a; box-shadow: inset 0 2px 0 rgba(42,58,74,0.08), 0 3px 0 #2a3a4a; outline: none; letter-spacing: 0.3px; }
+  .qd-search input:focus { border-color: #ff6a3a; box-shadow: inset 0 2px 0 rgba(42,58,74,0.08), 0 3px 0 #5a1818; }
+  .qd-search input::placeholder { color: #9aaab8; font-weight: 500; }
+  .qd-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+  .qd-search .clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; border-radius: 50%; background: #e0d4bc; border: 2px solid #2a3a4a; color: #2a3a4a; font-weight: 700; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 12px; line-height: 1; padding: 0; }
+  .qd-search.has-val .clear { display: flex; }
+  .qd-search-count { font-size: 12px; font-weight: 700; color: #5a6a7a; letter-spacing: 0.5px; padding: 0 4px; display: none; }
+  .qd-search-count.show { display: inline-block; }
+  /* When search is active, hide non-matching cards via body class */
+  body.qd-searching .card:not(.qd-match) { display: none; }
+
+  /* User-authored tag chips */
+  .qd-chips { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; }
+  .qd-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 9px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: lowercase; border: 2px solid #2a3a4a; background: #f0e4cc; color: #2a3a4a; line-height: 1.3; cursor: pointer; transition: background 0.1s; }
+  .qd-chip:hover { background: #ffd24a; }
+  .qd-chip.session { background: #2a3a4a; color: #ffd24a; border-color: #1a2530; text-transform: none; letter-spacing: 0.2px; }
+  .qd-chip.session:hover { background: #1a2530; color: #ffd24a; }
+  .qd-chip.session::before { content: '💬'; font-size: 10px; }
+  .qd-chip.priority { background: #ff6a3a; color: #fff; border-color: #5a1818; }
+  .qd-chip.priority:hover { background: #e0501a; }
+  .qd-chip .qd-chip-x { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; margin-left: 2px; background: rgba(0,0,0,0.18); color: inherit; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; }
+  .qd-chip .qd-chip-x:hover { background: rgba(255,0,0,0.55); color: #fff; }
+  .qd-chip-add { padding: 2px 8px; background: #fffdf2; border: 2px dashed #2a3a4a; border-radius: 9px; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; color: #5a6a7a; cursor: pointer; line-height: 1.3; }
+  .qd-chip-add:hover { background: #ffd24a; color: #2a3a4a; border-style: solid; }
+  .qd-chip-add-session { border-color: #1a2530; color: #2a3a4a; background: #f0e4cc; }
+  .qd-chip-add-session:hover { background: #2a3a4a; color: #ffd24a; border-color: #1a2530; border-style: solid; }
+  .qd-chip-input { padding: 3px 7px; border: 2px solid #ff6a3a; border-radius: 9px; font-size: 11px; font-family: inherit; font-weight: 600; max-width: 160px; outline: none; }
+  .qd-chip mark { background: transparent; color: inherit; font-weight: 900; text-decoration: underline; }
+
+  /* Session ribbon inside the .illus area — surfaces session:<name> tags as
+     a prominent pill right below the status pill (top-right of the card
+     image). Stacks vertically when a quest is bound to multiple sessions.
+     Pulses on `current` quests to draw the eye to "what's this session
+     working on?". */
+  .qd-session-stack { position: absolute; top: 44px; right: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; z-index: 2; max-width: 70%; }
+  .qd-session-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; background: #2a3a4a; color: #ffd24a; border: 2.5px solid #1a2530; border-radius: 12px; font-weight: 700; font-size: 11px; letter-spacing: 0.2px; line-height: 1.15; box-shadow: 0 2px 0 #1a2530; max-width: 100%; }
+  .qd-session-pill::before { content: '💬'; font-size: 11px; flex-shrink: 0; }
+  .qd-session-pill .qd-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+  .card.current .qd-session-pill { background: #5a1818; color: #ffd24a; border-color: #2a0a0a; box-shadow: 0 2px 0 #2a0a0a; animation: qd-sess-pulse 2.4s ease-in-out infinite; }
+  @keyframes qd-sess-pulse { 0%, 100% { box-shadow: 0 2px 0 #2a0a0a, 0 0 0 0 rgba(90,24,24,0); } 50% { box-shadow: 0 2px 0 #2a0a0a, 0 0 0 6px rgba(90,24,24,0.15); } }
+
+  /* Toast for API errors */
+  .qd-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #2a3a4a; color: #ffd24a; padding: 10px 18px; border-radius: 12px; font-weight: 700; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .qd-toast.show { opacity: 1; }
+  .qd-toast.error { background: #5a1818; color: #ffd9a8; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head">
+    <div class="title">
+      <div class="badge">{{level_roman}}</div>
+      <div>
+        <h1>{{name}} · Quest Log</h1>
+        <div class="sub">{{subtitle}} · {{counts.total}} entries</div>
+      </div>
+    </div>
+    <nav class="nav">
+      {{> _back-link}}
+      <a href="route.html">MAP</a>
+      <a href="quest-log.html" class="active">QUEST LOG</a>
+    </nav>
+    <div class="xp-block">
+      <div class="xp-bar"><div class="xp-fill" style="width:{{xp_pct}}%"></div><div class="xp-text">{{xp.current}} / {{xp.max}}</div></div>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filter quests by status (multi-select)">
+    <button class="filt on" type="button" data-status="current" aria-pressed="true" title="Show in-progress quests"><span class="icon">{{> icons/active}}</span>Active <span class="count">{{counts.current}}</span></button>
+    <button class="filt on" type="button" data-status="done" aria-pressed="true" title="Show completed quests"><span class="icon">{{> icons/visited}}</span>Visited <span class="count">{{counts.done}}</span></button>
+    <button class="filt on" type="button" data-status="locked" aria-pressed="true" title="Show locked quests"><span class="icon">{{> icons/sealed}}</span>Sealed <span class="count">{{counts.locked}}</span></button>
+    <span class="filt-sep" aria-hidden="true">·</span>
+    <button class="filt filt-action" type="button" data-action="show-all" title="Reveal all statuses">Show All</button>
+    <button class="filt filt-action" type="button" data-action="active-only" title="In-progress only">Active Only</button>
+    {{#if has_side_quests}}
+    <span class="filt-sep" aria-hidden="true">·</span>
+    <button class="filt-kind on" type="button" id="filt-kind-toggle" data-kind="all" title="Toggle between all quests, mains only, and subs only">
+      <span id="filt-kind-label">All ({{counts.total}})</span>
+    </button>
+    {{/if}}
+    <span class="filt-sep" aria-hidden="true">·</span>
+    <label class="qd-search" id="qd-search-wrap">
+      <span class="icon" aria-hidden="true">🔍</span>
+      <input id="qd-search-input" type="search" placeholder="Search by name, desc, tag…" autocomplete="off" />
+      <button class="clear" type="button" id="qd-search-clear" aria-label="Clear search">✕</button>
+    </label>
+    <span class="qd-search-count" id="qd-search-count"></span>
+  </div>
+
+  <div class="grid">
+    {{#each quests}}
+    <a class="card {{q.status_class}}{{#if q.is_side}} is-side{{/if}}{{#if q.has_children}} is-main-with-children{{/if}}" href="plan-card.html?q={{q.id}}" style="text-decoration:none;"
+       data-quest-id="{{q.id}}" data-project-id="{{id}}"
+       data-quest-name="{{q.name}}" data-quest-desc="{{q.desc}}"
+       data-quest-tags="{{q.tags_str}}" data-quest-status="{{q.status_class}}"
+       data-quest-kind="{{#if q.is_side}}side{{/if}}{{#if q.is_main}}main{{/if}}"
+       data-parent-n="{{q.parent_n}}">
+      <div class="illus">
+        <svg viewBox="0 0 280 150" preserveAspectRatio="xMidYMid meet">
+          <path d="M 0 90 Q 80 80 140 90 Q 200 100 280 88 L 280 150 L 0 150 Z" fill="#5cba5a"/>
+          <ellipse cx="140" cy="135" rx="56" ry="6" fill="rgba(0,0,0,0.18)"/>
+          <g transform="translate(140,108)">{{{q.landmark_svg}}}</g>
+        </svg>
+        <div class="num-badge">{{q.n}}</div>
+        <span class="stat-pill">{{q.status_class}}</span>
+        {{#if q.has_session_tags}}
+        <div class="qd-session-stack" title="Conversation(s) bound to this quest">{{{q.session_tags_html}}}</div>
+        {{/if}}
+      </div>
+      <div class="body">
+        <div class="qname-row" style="display:flex;align-items:flex-start;gap:6px;">
+          <h3 class="qname qd-qname-display" style="flex:1;margin:0;">{{q.name}}</h3>
+          <button class="qd-rename-btn" type="button" onclick="qlStartRename(event, this)" title="Rename quest" style="background:transparent;border:1.5px solid #c9a020;color:#c9a020;border-radius:5px;padding:1px 7px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:700;cursor:pointer;flex:none;align-self:flex-start;opacity:0;transition:opacity 0.12s;">✏</button>
+        </div>
+        <div class="qd-rename-edit" style="display:none;margin-bottom:6px;" onclick="event.stopPropagation()">
+          <input class="qd-rename-input" type="text" maxlength="200" onclick="event.stopPropagation()" style="width:100%;padding:6px 8px;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:700;border:2px solid #2a3a4a;border-radius:5px;background:#fff;color:#2a3a4a;box-sizing:border-box;"/>
+          <div style="display:flex;gap:5px;margin-top:5px;">
+            <button type="button" onclick="qlCommitRename(event, this)" style="flex:1;padding:4px;background:#5e9a4a;color:#fff;border:2px solid #2a3a4a;border-radius:5px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Save</button>
+            <button type="button" onclick="qlCancelRename(event, this)" style="flex:1;padding:4px;background:#fff;color:#2a3a4a;border:2px solid #2a3a4a;border-radius:5px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Cancel</button>
+          </div>
+          <div class="qd-rename-err" style="margin-top:4px;color:#c44545;font-size:10px;display:none;"></div>
+        </div>
+        <p class="qdesc">{{q.desc}}</p>
+        <!-- Parent/child relationship chip — surfaces which main a side belongs
+             to (and on a main, how many sides hang off it). -->
+        {{#if q.is_side}}
+        <div class="qd-conn-row qd-conn-side">
+          {{#if q.has_parent}}
+          <span class="qd-conn-chip qd-conn-chip-parent" role="link" tabindex="0" data-parent-href="plan-card.html?q={{q.parent_id}}" title="Open parent main quest">
+            <span class="qd-conn-arrow">↳</span>
+            <span class="qd-conn-label">part of</span>
+            <b>Quest #{{q.parent_n}} · {{q.parent_name}}</b>
+          </span>
+          {{/if}}
+        </div>
+        {{/if}}
+        {{#if q.has_children}}
+        <div class="qd-conn-row qd-conn-main">
+          <span class="qd-conn-chip qd-conn-chip-main" title="This main quest has {{q.child_count}} side quest(s) clustered around it on the map">
+            <span class="qd-conn-arrow">⛓</span>
+            <b>{{q.child_count}}</b>&nbsp;
+            <span class="qd-conn-label">side quest{{q.child_count_plural}}</span>
+          </span>
+        </div>
+        {{/if}}
+        <!-- User-authored tag chips. JS renders from data-quest-tags on the
+             card so add/remove can update DOM without a full reload. -->
+        <div class="qd-chips" data-qd-chips></div>
+        <div class="meta-row">
+          <span class="tag">{{q.xp_str}}</span>
+          <span class="tag plan">{{q.plan}}</span>
+        </div>
+        <div class="prog row-current">
+          <div class="prog-row"><span>QUEST PROGRESS</span><span>{{q.progress_pct}}%</span></div>
+          <div class="prog-bar"><div class="prog-fill" style="width:{{q.progress_pct}}%"></div></div>
+          <div class="prog-next">▶ {{q.next_step}}</div>
+        </div>
+        {{#if q.has_live_claims}}
+        <div class="qd-live-claims" title="Sessions currently working on this quest">
+          <span class="qd-live-claims-label">live</span>
+          {{{q.live_claims_html}}}
+        </div>
+        {{/if}}
+        <div class="done-row row-done">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5,12 10,17 19,7"/></svg>
+          Trophy claimed · +{{q.xp_reward}} XP
+        </div>
+        <div class="lock-row row-locked">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+          Awaits the next deed
+        </div>
+        {{#if q.depends_on_str}}
+        <div class="qd-dep-blocked">After: {{q.depends_on_str}}</div>
+        {{/if}}
+      </div>
+    </a>
+    {{/each}}
+  </div>
+</div>
+<script>
+(function() {
+  // Per-project storage key — pathname segment 1 is the project id
+  var pid = (location.pathname.split('/').filter(Boolean)[0]) || 'default';
+  var KEY = 'qd-filter-' + pid;
+  var STATUSES = ['current', 'done', 'locked'];
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+  }
+  function save(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  var state = load();
+  if (!Array.isArray(state.show)) state.show = STATUSES.slice();  // default: all visible
+  function apply() {
+    STATUSES.forEach(function(s) {
+      document.body.classList.toggle('hide-' + s, state.show.indexOf(s) === -1);
+    });
+    document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+      var on = state.show.indexOf(b.dataset.status) !== -1;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.filt[data-status]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var k = b.dataset.status;
+      var i = state.show.indexOf(k);
+      if (i === -1) state.show.push(k); else state.show.splice(i, 1);
+      save(state); apply();
+    });
+  });
+  document.querySelectorAll('.filt[data-action]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      var act = b.dataset.action;
+      if (act === 'show-all') state.show = STATUSES.slice();
+      else if (act === 'active-only') state.show = ['current'];
+      save(state); apply();
+    });
+  });
+  apply();
+
+  // ─── Main/Sub kind toggle (3-state: all → mains → subs → all…) ───────────
+  // Persists in the same per-project state object under state.kind.
+  var KINDS = ['all', 'main', 'sub'];
+  var kindBtn = document.getElementById('filt-kind-toggle');
+  if (kindBtn) {
+    if (!KINDS.includes(state.kind)) state.kind = 'all';
+    var mainCount = document.querySelectorAll('.card[data-quest-kind="main"]').length;
+    var subCount  = document.querySelectorAll('.card[data-quest-kind="side"]').length;
+    var total = mainCount + subCount;
+    var LABELS = {
+      all:  'All (' + total + ')',
+      main: 'Mains only (' + mainCount + ')',
+      sub:  'Subs only (' + subCount + ')',
+    };
+    function applyKind() {
+      document.body.classList.toggle('hide-kind-side', state.kind === 'main');
+      document.body.classList.toggle('hide-kind-main', state.kind === 'sub');
+      kindBtn.dataset.kind = state.kind;
+      kindBtn.classList.toggle('on', state.kind !== 'all');
+      document.getElementById('filt-kind-label').textContent = LABELS[state.kind];
+    }
+    kindBtn.addEventListener('click', function() {
+      var i = KINDS.indexOf(state.kind);
+      state.kind = KINDS[(i + 1) % KINDS.length];
+      save(state); applyKind();
+    });
+    applyKind();
+  }
+})();
+
+/* ============================================================
+   Tag chips: render from data-quest-tags, add/remove via API,
+   click a chip to filter by it.
+   ============================================================ */
+(function() {
+  var toast = null;
+  function showToast(msg, isErr) {
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'qd-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.className = 'qd-toast show' + (isErr ? ' error' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function() { toast.className = 'qd-toast' + (isErr ? ' error' : ''); }, 2200);
+  }
+
+  function chipClass(t) {
+    if (t.indexOf('session:') === 0)  return 'qd-chip session';
+    if (t.indexOf('priority:') === 0) return 'qd-chip priority';
+    return 'qd-chip';
+  }
+  function chipLabel(t) {
+    return t.indexOf('session:') === 0 ? t.slice(8) : t;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function renderChips(card) {
+    var slot = card.querySelector('[data-qd-chips]');
+    if (!slot) return;
+    var raw = (card.dataset.questTags || '').trim();
+    var tags = raw ? raw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+    var html = tags.map(function(t) {
+      var cls = chipClass(t);
+      return '<span class="' + cls + '" data-tag="' + esc(t) + '" title="Click to filter; ✕ to remove">'
+           +   esc(chipLabel(t))
+           +   '<span class="qd-chip-x" data-remove="' + esc(t) + '" title="Remove tag">×</span>'
+           + '</span>';
+    }).join('');
+    html += '<button type="button" class="qd-chip-add" data-add-tag title="Add a freeform tag (priority:p0, audit, area/auth, etc.)">+ tag</button>';
+    html += '<button type="button" class="qd-chip-add qd-chip-add-session" data-bind-session title="Bind to a chat conversation — auto-prefixed session:">💬 + session</button>';
+    slot.innerHTML = html;
+  }
+
+  // Initial render for every card
+  document.querySelectorAll('.card[data-quest-id]').forEach(renderChips);
+
+  // Single delegated handler for clicks inside any card
+  document.addEventListener('click', function(e) {
+    var card = e.target.closest('.card[data-quest-id]');
+    if (!card) return;
+
+    // Parent-quest chip on a sub-quest card — navigate to parent's plan-card.
+    // The chip is a <span> (not <a>) because nesting an <a> inside the outer
+    // card <a> is invalid HTML and breaks the grid layout in every browser.
+    var parentChip = e.target.closest('.qd-conn-chip-parent[data-parent-href]');
+    if (parentChip) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = parentChip.getAttribute('data-parent-href');
+      return;
+    }
+
+    // Remove tag (X button on a chip)
+    var removeBtn = e.target.closest('[data-remove]');
+    if (removeBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var removedTag = removeBtn.dataset.remove;
+      apiCall('/api/tags/remove', {
+        project: card.dataset.projectId,
+        id: card.dataset.questId,
+        tag: removedTag,
+      }).then(function(res) {
+        if (res.ok) {
+          card.dataset.questTags = (res.tags || []).join(',');
+          renderChips(card);
+          rerunSearch();
+          // Session ribbon is server-rendered — refresh to remove it visually.
+          if (removedTag.indexOf('session:') === 0) {
+            showToast('Removed: ' + removedTag + ' — refreshing…');
+            setTimeout(function() { location.reload(); }, 700);
+          }
+        } else {
+          showToast(res.msg || 'Failed', true);
+        }
+      });
+      return;
+    }
+
+    // Bind to a conversation (+ session button) — auto-prefixes "session:"
+    var bindBtn = e.target.closest('[data-bind-session]');
+    if (bindBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var sInput = document.createElement('input');
+      sInput.type = 'text';
+      sInput.className = 'qd-chip-input';
+      sInput.placeholder = 'conversation name…';
+      sInput.maxLength = 64;
+      bindBtn.replaceWith(sInput);
+      sInput.focus();
+      var sCommit = function() {
+        var val = (sInput.value || '').trim();
+        if (!val) { sInput.replaceWith(bindBtn); renderChips(card); return; }
+        apiCall('/api/tags/bind', {
+          project: card.dataset.projectId,
+          id: card.dataset.questId,
+          name: val,
+        }).then(function(res) {
+          if (res.ok) {
+            card.dataset.questTags = (res.tags || []).join(',');
+            renderChips(card);
+            rerunSearch();
+            // Reload to surface the new .illus session ribbon (server-rendered)
+            showToast('Bound to: ' + val + ' — refreshing…');
+            setTimeout(function() { location.reload(); }, 700);
+          } else {
+            showToast(res.msg || 'Failed', true);
+            renderChips(card);
+          }
+        });
+      };
+      sInput.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); sCommit(); }
+        else if (ev.key === 'Escape') { sInput.replaceWith(bindBtn); }
+      });
+      sInput.addEventListener('blur', sCommit);
+      return;
+    }
+
+    // Add tag (+ tag button)
+    var addBtn = e.target.closest('[data-add-tag]');
+    if (addBtn) {
+      e.preventDefault(); e.stopPropagation();
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'qd-chip-input';
+      input.placeholder = 'tag,tag2…';
+      input.maxLength = 200;
+      addBtn.replaceWith(input);
+      input.focus();
+      var commit = function() {
+        var val = (input.value || '').trim();
+        if (!val) { input.replaceWith(addBtn); renderChips(card); return; }
+        apiCall('/api/tags/add', {
+          project: card.dataset.projectId,
+          id: card.dataset.questId,
+          tag: val,
+        }).then(function(res) {
+          if (res.ok) {
+            card.dataset.questTags = (res.tags || []).join(',');
+            renderChips(card);
+            rerunSearch();
+            // If the user added a session:* tag manually, reload so the
+            // server-rendered .illus ribbon appears.
+            if (val.indexOf('session:') !== -1) {
+              showToast('Tagged: ' + val + ' — refreshing…');
+              setTimeout(function() { location.reload(); }, 700);
+            } else {
+              showToast('Tagged: ' + val);
+            }
+          } else {
+            showToast(res.msg || 'Failed', true);
+            renderChips(card);
+          }
+        });
+      };
+      input.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        else if (ev.key === 'Escape') { input.replaceWith(addBtn); }
+      });
+      input.addEventListener('blur', commit);
+      return;
+    }
+
+    // Chip body (not X) -> filter by this tag
+    var chip = e.target.closest('.qd-chip[data-tag]');
+    if (chip) {
+      e.preventDefault(); e.stopPropagation();
+      var si = document.getElementById('qd-search-input');
+      if (si) { si.value = chip.dataset.tag; si.dispatchEvent(new Event('input')); si.focus(); }
+      return;
+    }
+  });
+
+  function apiCall(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function(r) { return r.json(); })
+      .catch(function() { return { ok: false, msg: 'Network error' }; });
+  }
+  // Expose for the search block below
+  window.__qdRerunSearch = function() {};
+  function rerunSearch() { if (window.__qdRerunSearch) window.__qdRerunSearch(); }
+})();
+
+/* ============================================================
+   Search: live filter cards by name / desc / tags / status name.
+   Debounced; persists in URL ?q=... for shareable searches.
+   ============================================================ */
+(function() {
+  var input = document.getElementById('qd-search-input');
+  var clear = document.getElementById('qd-search-clear');
+  var wrap  = document.getElementById('qd-search-wrap');
+  var count = document.getElementById('qd-search-count');
+  if (!input) return;
+
+  function haystack(card) {
+    return [
+      card.dataset.questName  || '',
+      card.dataset.questDesc  || '',
+      card.dataset.questTags  || '',
+      card.dataset.questId    || '',
+      card.dataset.questStatus|| '',
+    ].join(' ').toLowerCase();
+  }
+
+  function run() {
+    var q = (input.value || '').trim().toLowerCase();
+    wrap.classList.toggle('has-val', q.length > 0);
+    document.body.classList.toggle('qd-searching', q.length > 0);
+    var matches = 0;
+    var total = 0;
+    document.querySelectorAll('.card[data-quest-id]').forEach(function(card) {
+      total++;
+      if (!q) { card.classList.remove('qd-match'); return; }
+      if (haystack(card).indexOf(q) !== -1) {
+        card.classList.add('qd-match');
+        matches++;
+      } else {
+        card.classList.remove('qd-match');
+      }
+    });
+    if (q) {
+      count.textContent = matches + ' / ' + total + ' match' + (matches === 1 ? '' : 'es');
+      count.classList.add('show');
+    } else {
+      count.classList.remove('show');
+    }
+    // Persist in URL (replace, no new history entry)
+    try {
+      var url = new URL(location.href);
+      if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
+      history.replaceState(null, '', url.toString());
+    } catch (e) {}
+  }
+  window.__qdRerunSearch = run;
+
+  // Debounce input
+  var t = null;
+  input.addEventListener('input', function() {
+    clearTimeout(t);
+    t = setTimeout(run, 80);
+  });
+  clear.addEventListener('click', function() { input.value = ''; run(); input.focus(); });
+  // Esc clears
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { input.value = ''; run(); }
+  });
+
+  // Initial state from URL
+  try {
+    var initial = new URL(location.href).searchParams.get('q') || '';
+    if (initial) { input.value = initial; run(); }
+  } catch (e) {}
+})();
+
+// ============ Quest title rename (in quest-log card) ============
+(function() {
+  // Reveal ✏ on card hover (inline opacity:0 base; we toggle on hover via JS to
+  // avoid cross-card CSS surgery).
+  document.querySelectorAll('a.card').forEach(function(card) {
+    var btn = card.querySelector('.qd-rename-btn');
+    if (!btn) return;
+    card.addEventListener('mouseenter', function() { btn.style.opacity = '1'; });
+    card.addEventListener('mouseleave', function() {
+      var edit = card.querySelector('.qd-rename-edit');
+      if (!edit || edit.style.display === 'none') btn.style.opacity = '0';
+    });
+  });
+
+  function ctx(buttonEl) {
+    var card = buttonEl.closest('a.card');
+    if (!card) return null;
+    return {
+      card: card,
+      project: card.dataset.projectId || '',
+      qid: card.dataset.questId || '',
+      titleEl: card.querySelector('.qd-qname-display'),
+      editEl: card.querySelector('.qd-rename-edit'),
+      btnEl: card.querySelector('.qd-rename-btn'),
+      inputEl: card.querySelector('.qd-rename-input'),
+      errEl: card.querySelector('.qd-rename-err'),
+    };
+  }
+
+  window.qlStartRename = function(ev, btn) {
+    ev.preventDefault();   // suppress <a> navigation
+    ev.stopPropagation();
+    var c = ctx(btn);
+    if (!c) return;
+    c.inputEl.value = c.titleEl.textContent.trim();
+    c.editEl.style.display = 'block';
+    c.titleEl.style.display = 'none';
+    c.btnEl.style.opacity = '0';
+    c.btnEl.style.pointerEvents = 'none';
+    c.errEl.style.display = 'none';
+    setTimeout(function() { c.inputEl.focus(); c.inputEl.select(); }, 30);
+  };
+
+  window.qlCancelRename = function(ev, btn) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    var c = ctx(btn);
+    if (!c) return;
+    c.editEl.style.display = 'none';
+    c.titleEl.style.display = '';
+    c.btnEl.style.opacity = '1';
+    c.btnEl.style.pointerEvents = '';
+    c.errEl.style.display = 'none';
+  };
+
+  window.qlCommitRename = function(ev, btn) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    var c = ctx(btn);
+    if (!c) return;
+    var newName = (c.inputEl.value || '').trim();
+    if (!newName) {
+      c.errEl.textContent = 'Name cannot be empty';
+      c.errEl.style.display = 'block';
+      return;
+    }
+    if (!c.project || !c.qid) {
+      c.errEl.textContent = 'Could not detect project/quest';
+      c.errEl.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    fetch('/api/quest/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: c.project, id: c.qid, name: newName }),
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.j.ok) throw new Error(res.j.error || res.j.msg || 'HTTP error');
+        c.titleEl.textContent = newName;
+        c.card.dataset.questName = newName;
+        c.editEl.style.display = 'none';
+        c.titleEl.style.display = '';
+        c.btnEl.style.opacity = '1';
+        c.btnEl.style.pointerEvents = '';
+        c.errEl.style.display = 'none';
+        setTimeout(function() { window.location.reload(); }, 600);
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        c.errEl.textContent = 'Rename failed: ' + e.message;
+        c.errEl.style.display = 'block';
+      });
+  };
+
+  // Enter commits, Esc cancels inside the rename input
+  document.addEventListener('keydown', function(e) {
+    if (!e.target || !e.target.classList || !e.target.classList.contains('qd-rename-input')) return;
+    var edit = e.target.closest('.qd-rename-edit');
+    if (!edit) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var saveBtn = edit.querySelectorAll('button')[0];
+      if (saveBtn) qlCommitRename(e, saveBtn);
+    } else if (e.key === 'Escape') {
+      var cancelBtn = edit.querySelectorAll('button')[1];
+      if (cancelBtn) qlCancelRename(e, cancelBtn);
+    }
+  });
+})();
+</script>
+</body>
+</html>

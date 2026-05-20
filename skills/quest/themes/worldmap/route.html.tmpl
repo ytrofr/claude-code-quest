@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{name}} — Route Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: 'Fredoka', system-ui, sans-serif; background: #5db4d8; padding: 18px; }
+  .frame { max-width: 1320px; margin: 0 auto; background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 30px rgba(20,40,60,0.4); }
+  .head { padding: 14px 22px; background: linear-gradient(180deg, #fff 0%, #f7eed8 100%); border-bottom: 4px solid #2a3a4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .title { display: flex; align-items: center; gap: 12px; }
+  .badge { width: 50px; height: 50px; background: #ffd24a; border: 3px solid #2a3a4a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; color: #2a3a4a; box-shadow: 0 3px 0 #c9a020; line-height: 1; }
+  h1 { margin: 0; font-weight: 700; font-size: 26px; color: #2a3a4a; line-height: 1.1; }
+  .sub { font-weight: 500; font-size: 14px; color: #6a7a8a; margin-top: 2px; }
+  .nav { display: flex; gap: 6px; margin: 0 8px; align-items: center; }
+  .nav a { padding: 8px 14px; background: #fffdf2; border: 2.5px solid #2a3a4a; border-radius: 10px; font-weight: 700; font-size: 13px; color: #2a3a4a; text-decoration: none; letter-spacing: 1px; text-transform: uppercase; }
+  .nav a.active { background: #2a3a4a; color: #ffd24a; }
+  .qd-back-link { padding: 6px 12px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; text-decoration: none; font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 3px 0 #c9a020; }
+  .qd-back-link:hover { transform: translateY(1px); box-shadow: 0 2px 0 #c9a020; }
+  .xp-block { display: flex; align-items: center; gap: 12px; }
+  .xp-label { font-weight: 700; font-size: 13px; color: #2a3a4a; text-transform: uppercase; letter-spacing: 1px; }
+  .xp-bar { width: 200px; height: 18px; background: #f0e4cc; border: 3px solid #2a3a4a; border-radius: 10px; overflow: hidden; position: relative; }
+  .xp-fill { height: 100%; background: linear-gradient(180deg, #ffd24a 0%, #d4a020 100%); border-right: 2px solid #2a3a4a; }
+  .xp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #2a3a4a; }
+  .map-wrap { position: relative; }
+  .map { width: 100%; display: block; background: #8fc97a; }
+  .legend { display: flex; gap: 14px; padding: 12px 22px; font-weight: 600; font-size: 13px; color: #4a5a6a; background: #fffdf2; border-top: 2px solid #2a3a4a; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #2a3a4a; }
+  .legend .hint { margin-left: auto; font-style: italic; color: #6a7a8a; font-weight: 500; }
+  .footer { padding: 14px 22px; background: #fffdf2; border-top: 4px solid #2a3a4a; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .now { display: flex; align-items: center; gap: 12px; }
+  .now-tag { padding: 5px 12px; background: #ff6a3a; color: #fff; font-weight: 700; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 4px; border: 2px solid #2a3a4a; box-shadow: 0 2px 0 #2a3a4a; }
+  .now-name { font-weight: 700; font-size: 20px; color: #2a3a4a; }
+  .progress-pill { display: flex; align-items: center; gap: 10px; }
+  .progress-pill .bar { width: 160px; height: 12px; background: #f0e4cc; border: 2px solid #2a3a4a; border-radius: 8px; overflow: hidden; }
+  .progress-pill .fill { height: 100%; background: linear-gradient(180deg, #ff8a4a 0%, #ff5a20 100%); }
+  .progress-pill .pct { font-weight: 700; font-size: 15px; color: #2a3a4a; }
+
+  /* Quest marker status visibility */
+  .qm { cursor: pointer; }
+  .qm:hover { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) brightness(1.05); }
+  .qm-locked { opacity: 0.7; }
+  .badge-done, .badge-current, .trainer { display: none; }
+  .qm-done .badge-done { display: block; }
+  .qm-current .badge-current { display: block; }
+  .qm-current .trainer { display: block; }
+  /* Pin fill + ring color per status (main pins) */
+  .qm .pin-bg { fill: #d8d4dc; }
+  .qm .pin-ring { stroke: #8a7a90; }
+  .qm-done .pin-bg { fill: #a8e89a; }
+  .qm-done .pin-ring { stroke: #5e9a4a; }
+  .qm-current .pin-bg { fill: #ffc8a8; }
+  .qm-current .pin-ring { stroke: #ff6a3a; }
+  /* Pulsing halo for current */
+  .qm .halo { opacity: 0; }
+  .qm-current .halo { opacity: 0.35; animation: halo 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes halo { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.25); opacity: 0.15; } }
+  /* Side-quest dots — hidden by default (hover-reveal) */
+  .qm.sq { opacity: 0; pointer-events: none; transition: opacity 0.25s ease-out, transform 0.25s ease-out; transform: scale(0.6); transform-origin: center; transform-box: fill-box; }
+  .qm.sq.reveal { opacity: 1; pointer-events: auto; transform: scale(1); }
+  .qm.sq .sq-dot { fill: #bbb; }
+  .qm-done.sq .sq-dot { fill: #5e9a4a; }
+  .qm-current.sq .sq-dot { fill: #ff6a3a; }
+  .qm.sq:hover { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)) brightness(1.1); }
+  .side-badge text { user-select: none; }
+  /* Animations (trainer + ! badge) */
+  .bobby { animation: bob 1.4s ease-in-out infinite; transform-origin: bottom center; transform-box: fill-box; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .twinkle { animation: tw 1.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes tw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
+  .lbl-region { font-family: 'Fredoka'; font-weight: 700; font-size: 10px; letter-spacing: 3px; }
+  .qd-chapters { display: flex; align-items: center; gap: 8px; padding: 10px 22px; background: #f0e4cc; border-top: 2px dashed #6a4828; font-family: 'Fredoka'; flex-wrap: wrap; }
+  .qd-chapters-mark { font-size: 16px; }
+  .qd-chapters-label { font-weight: 700; font-size: 12px; color: #6a4828; text-transform: uppercase; letter-spacing: 1.5px; }
+  .qd-chapters-list { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .qd-chapter-pill { padding: 3px 10px; background: #fff; border: 2px solid #6a4828; border-radius: 10px; font-weight: 600; font-size: 12px; color: #4a3010; }
+  .qd-dep-blocked { padding: 6px 12px; margin-top: 8px; background: #f7eed8; border: 2px dashed #c0a878; border-radius: 8px; font-size: 12px; color: #6a4828; font-weight: 600; }
+  .qd-dep-blocked::before { content: '⛓ '; color: #c44a2a; }
+  /* Reveal-all toolbar */
+  .reveal-toolbar { position: absolute; top: 14px; right: 14px; z-index: 4; display: flex; gap: 6px; }
+  .reveal-toolbar button { padding: 6px 12px; background: #fff; border: 2.5px solid #2a3a4a; border-radius: 10px; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 11px; color: #2a3a4a; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.2); letter-spacing: 0.5px; }
+  .reveal-toolbar button:hover { background: #ffd24a; }
+  .reveal-toolbar button.active { background: #2a3a4a; color: #ffd24a; }
+
+  /* ============ RICH QUEST CARD MODAL ============ */
+  .qm-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .qm-modal-backdrop.open { display: flex; }
+  .qm-modal { background: #fffdf2; border: 4px solid #2a3a4a; border-radius: 16px; padding: 22px 24px; width: 520px; max-width: 92vw; max-height: 92vh; overflow-y: auto; color: #2a3a4a; box-shadow: 0 16px 60px rgba(0,0,0,0.6); font-family: 'Fredoka', sans-serif; }
+  .qm-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .qm-status-row .dot { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #2a3a4a; }
+  .qm-status-row .lbl { font-weight: 700; font-size: 11px; letter-spacing: 2px; }
+  .qm-status-row .num { margin-left: auto; font-weight: 600; font-size: 11px; color: #6a7a8a; letter-spacing: 1px; }
+  .qm-modal .qm-name-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+  .qm-modal h3 { flex: 1; margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .qm-modal .qm-rename-btn { background: transparent; border: 1.5px solid #c9a020; color: #c9a020; border-radius: 6px; padding: 4px 10px; font-family: 'Fredoka', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; align-self: center; }
+  .qm-side-banner { background: #e8f0d8; border: 2px dashed #5e9a4a; border-radius: 8px; padding: 6px 10px; font-size: 11px; color: #3a5a18; font-weight: 600; margin: 6px 0 10px; }
+  .qm-tag-row { display: flex; gap: 5px; margin: 4px 0 12px; flex-wrap: wrap; }
+  .qm-tag-row span { font-size: 10px; font-weight: 700; padding: 2px 8px; background: #f0e4cc; border: 1.5px solid #c9a020; border-radius: 8px; color: #6a4828; letter-spacing: 0.5px; text-transform: uppercase; }
+  .qm-prog-bar { height: 12px; background: #f0e4cc; border: 2px solid #2a3a4a; border-radius: 8px; overflow: hidden; }
+  .qm-prog-fill { height: 100%; background: linear-gradient(180deg, #ff8a4a, #ff5a20); }
+  .qm-prog-text { font-size: 11px; color: #6a7a8a; font-weight: 600; margin: 3px 0 11px; }
+  .qm-section { margin-bottom: 11px; }
+  .qm-section-title { font-weight: 700; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #2a3a4a; margin-bottom: 4px; }
+  .qm-section-body { font-size: 13px; line-height: 1.45; color: #3a4858; }
+  .qm-section-body.next { background: #fff8dc; border-left: 3px solid #ffd24a; padding: 6px 10px; border-radius: 4px; font-weight: 600; }
+  .qm-section code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; background: #f0e4cc; padding: 1px 6px; border-radius: 4px; color: #5a4828; display: inline-block; margin: 1px 2px; }
+  /* Connected quests list */
+  .qm-conn-list { display: flex; flex-direction: column; gap: 5px; max-height: 160px; overflow-y: auto; padding-right: 4px; }
+  .qm-conn-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f7eed8; border: 1.5px solid #c9a020; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+  .qm-conn-item:hover { background: #ffd24a; }
+  .qm-conn-item .conn-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #2a3a4a; flex-shrink: 0; }
+  .qm-conn-item .conn-n { font-weight: 700; font-size: 11px; color: #6a4828; min-width: 24px; }
+  .qm-conn-item .conn-name { font-size: 12px; color: #2a3a4a; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qm-conn-item .conn-status { font-size: 10px; font-weight: 700; color: #6a4828; text-transform: uppercase; letter-spacing: 0.5px; }
+  .qm-conn-parent { padding: 8px 12px; background: #fff8dc; border-left: 3px solid #ffd24a; border-radius: 4px; font-size: 12px; color: #2a3a4a; cursor: pointer; }
+  .qm-conn-parent:hover { background: #ffd24a; }
+  .qm-conn-parent b { font-weight: 700; }
+  .qm-modal-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 2px dashed #c9a020; }
+  .qm-modal-actions a, .qm-modal-actions button { flex: 1; padding: 10px 14px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 10px; color: #2a3a4a; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; text-align: center; font-family: 'Fredoka', sans-serif; box-shadow: 0 3px 0 #c9a020; text-transform: uppercase; letter-spacing: 1px; }
+  .qm-modal-actions button.secondary { background: #fff; }
+  .qm-modal-actions a:hover, .qm-modal-actions button:hover { transform: translateY(1px); box-shadow: 0 2px 0 #c9a020; }
+  .qm-rename-input { width: 100%; padding: 8px 10px; font-family: 'Fredoka', sans-serif; font-size: 14px; font-weight: 700; border: 2px solid #2a3a4a; border-radius: 6px; background: #fff; color: #2a3a4a; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head">
+    <div class="title">
+      <div class="badge">{{level_roman}}</div>
+      <div>
+        <h1>{{name}} Region</h1>
+        <div class="sub">{{subtitle}} · {{counts.total}} routes</div>
+      </div>
+    </div>
+    <nav class="nav">
+      {{> _back-link}}
+      <a href="route.html" class="active">MAP</a>
+      <a href="quest-log.html">QUEST LOG</a>
+    </nav>
+    <div class="xp-block">
+      <span class="xp-label">XP</span>
+      <div class="xp-bar"><div class="xp-fill" style="width:{{xp_pct}}%"></div><div class="xp-text">{{xp.current}} / {{xp.max}}</div></div>
+    </div>
+  </header>
+
+  {{#if has_backlog}}
+  <!-- ===== Wishlist Tray (mission ideas waiting to become quests) ===== -->
+  <style>
+    .wt-tray { background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4), transparent 60%), #e8d4a8; border: 3px dashed #6a3a18; border-radius: 12px; padding: 22px 24px 18px; margin: 12px 0 18px; position: relative; color: #2a3a4a; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+    .wt-tray::before { content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); width: 18px; height: 18px; background: radial-gradient(circle at 35% 35%, #d63a3a 30%, #8a1010 65%, transparent 70%); border-radius: 50%; box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+    .wt-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px dashed #8a5a30; }
+    .wt-icon { width: 36px; height: 36px; background: #ffd24a; border: 2.5px solid #2a3a4a; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 0 #c9a020; color: #2a3a4a; }
+    .wt-title-block { flex: 1; }
+    .wt-title { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 16px; color: #2a3a4a; text-transform: uppercase; letter-spacing: 1.5px; }
+    .wt-sub { font-size: 11px; color: #8a5a30; font-family: -apple-system, sans-serif; font-weight: 500; margin-top: 2px; }
+    .wt-actions { display: flex; gap: 8px; }
+    .wt-btn { min-height: 36px; padding: 6px 14px; border-radius: 8px; border: 2px solid #2a3a4a; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 2px 0 rgba(0,0,0,0.3); display: inline-flex; align-items: center; gap: 6px; color: #2a3a4a; }
+    .wt-btn:hover { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+    .wt-btn-cream { background: #fffdf2; }
+    .wt-btn-gold { background: #ffd24a; }
+    .wt-notes { display: grid; gap: 10px; }
+    .wt-note { background: #fffdf2; border: 2px solid #8a5a30; border-radius: 6px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+    .wt-tick { width: 18px; height: 18px; border: 2.5px solid #2a3a4a; border-radius: 4px; background: #fff; flex-shrink: 0; }
+    .wt-note-text { flex: 1; min-width: 0; }
+    .wt-note-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 13px; color: #2a3a4a; line-height: 1.4; }
+    .wt-note-meta { font-family: -apple-system, sans-serif; font-size: 11px; color: #6a7a8a; margin-top: 3px; line-height: 1.5; }
+    .wt-note-meta b { color: #6a3a18; font-family: 'Fredoka', sans-serif; }
+    .wt-note-meta.danger { color: #b8341a; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+    .wt-inline { font-family: 'JetBrains Mono', monospace; background: #f8e8c8; padding: 1px 5px; border: 1px solid #8a5a30; border-radius: 3px; font-size: 12px; }
+  </style>
+  <section class="wt-tray" aria-label="Wishlist of mission ideas">
+    <div class="wt-head">
+      <span class="wt-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <path d="M4 20 L8 16 M8 16 C 8 8, 14 4, 20 4 C 20 10, 16 16, 8 16 Z"/>
+        </svg>
+      </span>
+      <div class="wt-title-block">
+        <div class="wt-title">Wishlist · {{backlog_count}} ideas</div>
+        <div class="wt-sub">{{backlog_ready_count}} ready · {{backlog_sparse_count}} sparse · edit <code style="font-family:'JetBrains Mono',monospace;background:#f8e8c8;padding:1px 5px;border:1px solid #8a5a30;border-radius:3px;font-size:11px;">data/backlog/{{id}}.md</code></div>
+      </div>
+      <div class="wt-actions">
+        <button type="button" class="wt-btn wt-btn-cream" onclick="window.openQuestEditor &amp;&amp; window.openQuestEditor('backlog', '{{id}}', '{{name}} · Backlog');" aria-label="Edit backlog file">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M2 14 L4 10 L11 3 L13 5 L6 12 L2 14 Z M9 5 L11 7"/></svg>
+          Edit
+        </button>
+        <button type="button" class="wt-btn wt-btn-gold" onclick="alert('Promotion ritual not wired yet — coming next.\nFor now run: /quest promote {{id}}');" aria-label="Scribe all unchecked ideas into quests">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 20 L8 16 M8 16 C 8 8, 14 4, 20 4 C 20 10, 16 16, 8 16 Z"/></svg>
+          Scribe all
+        </button>
+      </div>
+    </div>
+    <div class="wt-notes">
+      {{#each backlog}}
+      <div class="wt-note">
+        <span class="wt-tick" aria-label="Unchecked"></span>
+        <div class="wt-note-text">
+          <div class="wt-note-title">{{{q.title_html}}}</div>
+          {{#if q.sparse}}
+          <div class="wt-note-meta danger">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M8 2 L14 13 L2 13 Z"/><path d="M8 6 V9 M8 11 V11.5" stroke-linecap="round"/></svg>
+            sparse — needs Why &amp; Effort before scribing
+          </div>
+          {{/if}}
+          {{#if q.why}}
+          <div class="wt-note-meta">
+            <b>Why:</b> {{q.why}}{{#if q.effort}} &nbsp;·&nbsp; <b>Effort:</b> {{q.effort}}{{/if}}{{#if q.tag}} &nbsp;·&nbsp; #{{q.tag}}{{/if}}
+          </div>
+          {{/if}}
+        </div>
+        <button type="button" class="wt-btn wt-btn-cream" onclick="alert('Per-note scribe not wired yet — coming next.\nFor now run: /quest promote {{id}}');" aria-label="Scribe this idea">
+          Scribe
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8 H13 M9 4 L13 8 L9 12"/></svg>
+        </button>
+      </div>
+      {{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  <div class="map-wrap">
+    <div class="reveal-toolbar">
+      <button onclick="showAllSides()" id="btn-show">👁  Show all sides</button>
+      <button onclick="hideAllSides()" id="btn-hide" class="active">🫥  Hover only</button>
+    </div>
+
+    <svg class="map" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid slice">
+      <!-- ===== COASTAL SCENERY ===== -->
+      <!-- Sky strip -->
+      <rect x="0" y="0" width="1200" height="60" fill="#bbe4f5"/>
+      <g fill="#fff" opacity="0.9">
+        <ellipse cx="200" cy="32" rx="44" ry="14"/><ellipse cx="222" cy="26" rx="32" ry="11"/>
+        <ellipse cx="800" cy="28" rx="50" ry="14"/><ellipse cx="820" cy="22" rx="36" ry="11"/>
+      </g>
+      <!-- Grass -->
+      <rect x="0" y="60" width="1200" height="380" fill="#8fc97a"/>
+      <!-- Sea fills bottom band (~100px) -->
+      <path d="M 0 440 Q 100 450 200 440 T 400 448 T 600 436 T 800 452 T 1000 438 T 1200 448 L 1200 540 L 0 540 Z" fill="#7ec0dc"/>
+      <path d="M 0 440 Q 100 450 200 440 T 400 448 T 600 436 T 800 452 T 1000 438 T 1200 448" stroke="#4a90b0" stroke-width="3" fill="none"/>
+      <g stroke="#fff" stroke-width="1.5" fill="none" opacity="0.7">
+        <path d="M 200 480 q 8 -3 16 0 t 16 0"/>
+        <path d="M 500 500 q 8 -3 16 0 t 16 0"/>
+        <path d="M 900 490 q 8 -3 16 0 t 16 0"/>
+      </g>
+      <!-- Distant mountains top-left -->
+      <g>
+        <polygon points="60,100 130,40 200,100" fill="#a89380" stroke="#5a4830" stroke-width="3"/>
+        <polygon points="80,100 110,60 140,100" fill="#bda594" stroke="#5a4830" stroke-width="2"/>
+        <polygon points="170,100 220,70 270,100" fill="#a89380" stroke="#5a4830" stroke-width="3"/>
+        <polygon points="190,100 220,80 250,100" fill="#fff" opacity="0.6"/>
+      </g>
+      <text x="180" y="55" text-anchor="middle" class="lbl-region" fill="#2a3a4a">— COASTLINE ROUTE —</text>
+      <text x="600" y="515" text-anchor="middle" class="lbl-region" fill="#205070">— THE GREAT SEA —</text>
+      <!-- Palms -->
+      <g stroke="#2a3a4a" stroke-width="2">
+        <g transform="translate(280,440)"><ellipse cx="0" cy="4" rx="10" ry="3" fill="rgba(0,0,0,0.25)"/><path d="M -2 0 Q -3 -10 0 -22 Q 3 -10 2 0 Z" fill="#6a4020"/><path d="M 0 -22 q -16 -4 -22 6 q 16 -2 22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q 16 -4 22 6 q -16 -2 -22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q -8 -16 -20 -14 q 14 4 20 14 z" fill="#3a7a3a"/><path d="M 0 -22 q 8 -16 20 -14 q -14 4 -20 14 z" fill="#3a7a3a"/></g>
+        <g transform="translate(680,440)"><ellipse cx="0" cy="4" rx="10" ry="3" fill="rgba(0,0,0,0.25)"/><path d="M -2 0 Q -3 -10 0 -22 Q 3 -10 2 0 Z" fill="#6a4020"/><path d="M 0 -22 q -16 -4 -22 6 q 16 -2 22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q 16 -4 22 6 q -16 -2 -22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q -8 -16 -20 -14 q 14 4 20 14 z" fill="#3a7a3a"/><path d="M 0 -22 q 8 -16 20 -14 q -14 4 -20 14 z" fill="#3a7a3a"/></g>
+        <g transform="translate(990,440)"><ellipse cx="0" cy="4" rx="10" ry="3" fill="rgba(0,0,0,0.25)"/><path d="M -2 0 Q -3 -10 0 -22 Q 3 -10 2 0 Z" fill="#6a4020"/><path d="M 0 -22 q -16 -4 -22 6 q 16 -2 22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q 16 -4 22 6 q -16 -2 -22 0 z" fill="#3a7a3a"/><path d="M 0 -22 q -8 -16 -20 -14 q 14 4 20 14 z" fill="#3a7a3a"/><path d="M 0 -22 q 8 -16 20 -14 q -14 4 -20 14 z" fill="#3a7a3a"/></g>
+      </g>
+      <!-- Inland trees -->
+      <g>
+        <g transform="translate(60,200)"><ellipse cx="0" cy="18" rx="13" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="4" width="6" height="12" fill="#6a4020"/><circle cx="0" cy="0" r="16" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/><circle cx="-4" cy="-4" r="8" fill="#4a8a4a" opacity="0.6"/></g>
+        <g transform="translate(110,230)"><ellipse cx="0" cy="14" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-2" y="2" width="4" height="10" fill="#6a4020"/><circle cx="0" cy="0" r="12" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(310,160)"><ellipse cx="0" cy="16" rx="11" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="2" width="6" height="12" fill="#6a4020"/><circle cx="0" cy="0" r="14" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(580,140)"><ellipse cx="0" cy="16" rx="11" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="2" width="6" height="12" fill="#6a4020"/><circle cx="0" cy="0" r="14" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(870,140)"><ellipse cx="0" cy="16" rx="11" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="2" width="6" height="12" fill="#6a4020"/><circle cx="0" cy="0" r="14" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(1140,150)"><ellipse cx="0" cy="16" rx="11" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-3" y="2" width="6" height="12" fill="#6a4020"/><circle cx="0" cy="0" r="14" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(160,400)"><ellipse cx="0" cy="14" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-2" y="2" width="4" height="10" fill="#6a4020"/><circle cx="0" cy="0" r="12" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(440,400)"><ellipse cx="0" cy="14" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-2" y="2" width="4" height="10" fill="#6a4020"/><circle cx="0" cy="0" r="13" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(720,400)"><ellipse cx="0" cy="14" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-2" y="2" width="4" height="10" fill="#6a4020"/><circle cx="0" cy="0" r="13" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+        <g transform="translate(1000,400)"><ellipse cx="0" cy="14" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/><rect x="-2" y="2" width="4" height="10" fill="#6a4020"/><circle cx="0" cy="0" r="12" fill="#3a7a3a" stroke="#2a5a2a" stroke-width="2"/></g>
+      </g>
+
+      <!-- Sandy path (Catmull-Rom curve through the 9 spread-out main pin centers) -->
+      <path d="M 90 330 C 112.5 308.3 180 198.3 225 200 C 270 201.7 314.2 341.7 360 340 C 405.8 338.3 453.3 190 500 190 C 546.7 190 593.3 340 640 340 C 686.7 340 733.3 190 780 190 C 826.7 190 875 336.7 920 340 C 965 343.3 1011.7 213.3 1050 210 C 1088.3 206.7 1133.3 301.7 1150 320"
+            stroke="#5a4830" stroke-width="40" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 90 330 C 112.5 308.3 180 198.3 225 200 C 270 201.7 314.2 341.7 360 340 C 405.8 338.3 453.3 190 500 190 C 546.7 190 593.3 340 640 340 C 686.7 340 733.3 190 780 190 C 826.7 190 875 336.7 920 340 C 965 343.3 1011.7 213.3 1050 210 C 1088.3 206.7 1133.3 301.7 1150 320"
+            stroke="#efd9a3" stroke-width="32" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 90 330 C 112.5 308.3 180 198.3 225 200 C 270 201.7 314.2 341.7 360 340 C 405.8 338.3 453.3 190 500 190 C 546.7 190 593.3 340 640 340 C 686.7 340 733.3 190 780 190 C 826.7 190 875 336.7 920 340 C 965 343.3 1011.7 213.3 1050 210 C 1088.3 206.7 1133.3 301.7 1150 320"
+            stroke="#fff" stroke-width="2" fill="none" stroke-dasharray="3 14" opacity="0.55"/>
+
+      <!-- ===== SIDE QUESTS (hidden by default, hover-reveal) ===== -->
+      {{#each side_quests}}
+      <g transform="{{q.transform}}" class="qm sq qm-{{q.status_class}}" data-quest="{{q.id}}" data-side="1" data-parent-n="{{q.parent_n}}">
+        <circle r="9" fill="#fff" stroke="#2a3a4a" stroke-width="2"/>
+        <circle r="5" class="sq-dot"/>
+        <title>Side quest {{q.n}}: {{q.name}}</title>
+      </g>
+      {{/each}}
+
+      <!-- ===== MAIN QUEST MARKERS (big landmark + label + "+N" badge for child count) ===== -->
+      {{#each main_quests}}
+      <g transform="{{q.transform}}" class="qm qm-{{q.status_class}}" data-quest="{{q.id}}" data-main-n="{{q.n}}">
+        <circle class="halo" r="40" fill="#ffd24a" opacity="0"/>
+        <ellipse cx="0" cy="26" rx="28" ry="6" fill="rgba(20,40,60,0.3)"/>
+        <circle class="pin-bg" r="30" stroke="#2a3a4a" stroke-width="3"/>
+        <circle class="pin-ring" r="30" fill="none" stroke-width="3" opacity="0.65"/>
+        <g transform="scale(1.3)">{{{q.landmark_svg}}}</g>
+
+        <!-- Done check badge (CSS-toggled) -->
+        <g class="badge-done">
+          <circle cx="26" cy="-26" r="12" fill="#5e9a4a" stroke="#fff" stroke-width="3"/>
+          <path d="M 21 -26 l 3 4 l 7 -7" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+
+        <!-- Current ! badge + trainer pawn (CSS-toggled) -->
+        <g class="badge-current twinkle">
+          <circle cx="0" cy="-58" r="14" fill="#ffd24a" stroke="#5a1818" stroke-width="3"/>
+          <text x="0" y="-58" text-anchor="middle" dominant-baseline="central" font-family="Fredoka" font-weight="900" font-size="18" fill="#5a1818">!</text>
+        </g>
+        <g class="trainer bobby" transform="translate(-58, 0)">
+          <ellipse cx="0" cy="22" rx="10" ry="3" fill="rgba(0,0,0,0.3)"/>
+          <circle cx="0" cy="-8" r="9" fill="#ffd9a8" stroke="#3a2010" stroke-width="2"/>
+          <circle cx="-3" cy="-9" r="1.2" fill="#3a2010"/><circle cx="3" cy="-9" r="1.2" fill="#3a2010"/>
+          <path d="M -10 -14 Q 0 -22 10 -14 L 10 -10 L -10 -10 Z" fill="#d63a3a" stroke="#3a2010" stroke-width="2"/>
+          <rect x="-7" y="0" width="14" height="14" fill="#3a78d0" stroke="#1a3060" stroke-width="2"/>
+          <rect x="-9" y="14" width="6" height="8" fill="#3a2010"/><rect x="3" y="14" width="6" height="8" fill="#3a2010"/>
+        </g>
+
+        <!-- Number badge below pin -->
+        <g transform="translate(0,42)">
+          <circle r="13" fill="#2a3a4a"/>
+          <text y="4" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="14" fill="#ffd24a">{{q.n}}</text>
+        </g>
+
+        <!-- Label pill -->
+        <rect x="{{q.label_x}}" y="60" width="{{q.label_width}}" height="26" fill="#fff" stroke="#2a3a4a" stroke-width="2.5" rx="13"/>
+        <text x="0" y="77" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="13" fill="#2a3a4a">{{q.name}}</text>
+
+        <!-- "+N" side-count badge (top-right of pin); only rendered if children exist, filled by JS post-mount -->
+        <g class="side-count-slot" pointer-events="none"></g>
+      </g>
+      {{/each}}
+
+      <!-- Compass -->
+      <g transform="translate(60, 70)">
+        <circle r="24" fill="#fff" stroke="#2a3a4a" stroke-width="2.5"/>
+        <polygon points="0,-18 5,0 0,18 -5,0" fill="#d63a3a"/>
+        <polygon points="-18,0 0,-3 18,0 0,3" fill="#2a3a4a"/>
+        <text x="0" y="-28" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="10" fill="#2a3a4a">N</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#a8e89a"></span>visited ({{counts.done}})</span>
+    <span><span class="dot" style="background:#ffc8a8"></span>now ({{counts.current}})</span>
+    <span><span class="dot" style="background:#d8d4dc"></span>sealed ({{counts.locked}})</span>
+    {{#if has_side_quests}}<span><span class="dot" style="background:#fff;border:2.5px solid #2a3a4a;width:10px;height:10px;"></span>side quests ({{side_quest_count}}) — hover any main</span>{{/if}}
+    <span class="hint">👆 click any pin for full details + connected quests</span>
+  </div>
+  {{> _chapters}}
+
+  <footer class="footer">
+    <div class="now">
+      <span class="now-tag">Quest {{active.n}}</span>
+      <span class="now-name">{{active.name}}</span>
+    </div>
+    <div class="progress-pill">
+      <div class="bar"><div class="fill" style="width:{{active_progress_pct}}%"></div></div>
+      <span class="pct">{{active_progress_pct}}%</span>
+    </div>
+  </footer>
+</div>
+
+<!-- ===== RICH QUEST CARD MODAL ===== -->
+<div class="qm-modal-backdrop" id="qm-modal-backdrop">
+  <div class="qm-modal">
+    <div class="qm-status-row">
+      <span class="dot" id="qm-status-dot" style="background:#bbb"></span>
+      <span class="lbl" id="qm-status-lbl">QUEST</span>
+      <span class="num" id="qm-num"></span>
+    </div>
+    <div class="qm-name-row">
+      <h3 id="qm-name">Quest Name</h3>
+      <button class="qm-rename-btn" id="qm-rename-btn" onclick="qmStartRename()">✏ Rename</button>
+    </div>
+    <div id="qm-rename-edit" style="display:none;margin-bottom:10px;">
+      <input id="qm-rename-input" class="qm-rename-input" type="text" maxlength="200"/>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button onclick="qmCommitRename()" style="flex:1;padding:6px;background:#5e9a4a;color:#fff;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+        <button onclick="qmCancelRename()" style="flex:1;padding:6px;background:#fff;color:#2a3a4a;border:2px solid #2a3a4a;border-radius:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Cancel</button>
+      </div>
+      <div id="qm-rename-err" style="margin-top:6px;color:#c44545;font-size:11px;display:none;font-family:-apple-system,sans-serif;"></div>
+    </div>
+    <div id="qm-side-banner" class="qm-side-banner" style="display:none;">⛓ <b>Side quest</b> — see "Connected quests" below to jump to its main</div>
+    <div class="qm-tag-row" id="qm-tags"></div>
+    <div class="qm-prog-bar"><div class="qm-prog-fill" id="qm-prog-fill" style="width:0%;"></div></div>
+    <div class="qm-prog-text" id="qm-prog-text">0% complete</div>
+
+    <div class="qm-section" id="qm-problem-sec" style="display:none;">
+      <div class="qm-section-title">🔴 Problem</div>
+      <div class="qm-section-body" id="qm-problem"></div>
+    </div>
+    <div class="qm-section" id="qm-solution-sec" style="display:none;">
+      <div class="qm-section-title">🟢 Solution</div>
+      <div class="qm-section-body" id="qm-solution"></div>
+    </div>
+    <div class="qm-section" id="qm-tasks-sec" style="display:none;">
+      <div class="qm-section-title">✅ Tasks</div>
+      <div class="qm-section-body" id="qm-tasks-text"></div>
+    </div>
+    <div class="qm-section" id="qm-next-sec" style="display:none;">
+      <div class="qm-section-title">👉 Next step</div>
+      <div class="qm-section-body next" id="qm-next"></div>
+    </div>
+    <div class="qm-section" id="qm-files-sec" style="display:none;">
+      <div class="qm-section-title">📁 Files touched (<span id="qm-files-count">0</span>)</div>
+      <div class="qm-section-body" id="qm-files"></div>
+    </div>
+
+    <div class="qm-section" id="qm-conn-sec" style="display:none;">
+      <div class="qm-section-title" id="qm-conn-title">🔗 Connected quests</div>
+      <div id="qm-conn-body"></div>
+    </div>
+
+    <div class="qm-modal-actions">
+      <a id="qm-open-card" href="#" target="_blank">Open full quest card →</a>
+      <button class="secondary" onclick="qmCloseModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const PROJ = "{{id}}";
+  const QUESTS = {{{quests_json_blob}}};
+  const QUEST_BY_ID = {};
+  const QUEST_BY_N = {};
+  for (const q of QUESTS) { QUEST_BY_ID[q.id] = q; if (q.n) QUEST_BY_N[q.n] = q; }
+
+  // Build CHILDREN_BY_PARENT_N — for main quests, list of side quests under them
+  const CHILDREN_BY_PARENT_N = {};
+  for (const q of QUESTS) {
+    if (q.n && q.parent_n) {
+      (CHILDREN_BY_PARENT_N[q.parent_n] = CHILDREN_BY_PARENT_N[q.parent_n] || []).push(q);
+    } else if (q.n && q.n > 9) {
+      // Fallback if parent_n missing from blob — derive
+      const pn = ((q.n - 1) % 9) + 1;
+      (CHILDREN_BY_PARENT_N[pn] = CHILDREN_BY_PARENT_N[pn] || []).push(q);
+    }
+  }
+
+  const STATUS_COLOR = {done:'#5e9a4a', current:'#ff6a3a', locked:'#bbb', unknown:'#bbb'};
+  const STATUS_LABEL = {done:'QUEST · CLEARED', current:'QUEST · NOW', locked:'QUEST · SEALED', unknown:'QUEST'};
+  const STATUS_SHORT = {done:'CLEARED', current:'NOW', locked:'SEALED'};
+
+  let _current = null;
+
+  function setSec(textId, secId, value) {
+    const sec = document.getElementById(secId);
+    if (value && String(value).trim()) {
+      sec.style.display = 'block';
+      document.getElementById(textId).textContent = value;
+    } else {
+      sec.style.display = 'none';
+    }
+  }
+
+  window.openModal = function(data) {
+    if (typeof data === 'string') data = QUEST_BY_ID[data] || {id: data, name: data};
+    _current = data;
+    const status = data.status || 'unknown';
+    document.getElementById('qm-status-dot').style.background = STATUS_COLOR[status] || STATUS_COLOR.unknown;
+    document.getElementById('qm-status-lbl').textContent = STATUS_LABEL[status] || 'QUEST';
+    document.getElementById('qm-num').textContent = data.n ? ('Quest #' + data.n) : '';
+    document.getElementById('qm-name').textContent = data.name || data.id;
+
+    // Side banner
+    const isSide = !!(data.n && data.n > 9);
+    document.getElementById('qm-side-banner').style.display = isSide ? 'block' : 'none';
+
+    // Tags
+    const tagsEl = document.getElementById('qm-tags');
+    tagsEl.innerHTML = '';
+    (data.tags || []).slice(0, 6).forEach(t => { const s = document.createElement('span'); s.textContent = t; tagsEl.appendChild(s); });
+
+    // Progress
+    const pct = Math.round((data.progress || 0) * 100);
+    document.getElementById('qm-prog-fill').style.width = pct + '%';
+    const td = data.tasks_done || 0, tt = data.tasks_total || 0;
+    document.getElementById('qm-prog-text').textContent = tt
+      ? (pct + '% · ' + td + ' of ' + tt + ' tasks done')
+      : (pct + '% complete');
+
+    setSec('qm-problem',  'qm-problem-sec',  data.problem);
+    setSec('qm-solution', 'qm-solution-sec', data.solution);
+
+    if (tt > 0) {
+      document.getElementById('qm-tasks-sec').style.display = 'block';
+      document.getElementById('qm-tasks-text').textContent = td + ' done · ' + (tt - td) + ' remaining';
+    } else {
+      document.getElementById('qm-tasks-sec').style.display = 'none';
+    }
+
+    setSec('qm-next', 'qm-next-sec', data.next_step);
+
+    // Files touched
+    const fc = data.files_count || 0;
+    if (fc > 0) {
+      document.getElementById('qm-files-sec').style.display = 'block';
+      document.getElementById('qm-files-count').textContent = fc;
+      const filesEl = document.getElementById('qm-files');
+      filesEl.innerHTML = '';
+      (data.files || []).slice(0, 6).forEach(f => { const c = document.createElement('code'); c.textContent = f; filesEl.appendChild(c); });
+      if (fc > (data.files || []).length) {
+        const span = document.createElement('span');
+        span.style.color = '#9a8a78'; span.style.fontStyle = 'italic'; span.style.fontSize = '11px';
+        span.textContent = ' +' + (fc - (data.files || []).length) + ' more in full card';
+        filesEl.appendChild(span);
+      }
+    } else {
+      document.getElementById('qm-files-sec').style.display = 'none';
+    }
+
+    // ───── CONNECTED QUESTS ─────
+    const connSec = document.getElementById('qm-conn-sec');
+    const connBody = document.getElementById('qm-conn-body');
+    const connTitle = document.getElementById('qm-conn-title');
+    connBody.innerHTML = '';
+    if (isSide) {
+      const parentN = data.parent_n || (((data.n - 1) % 9) + 1);
+      const parent = QUEST_BY_N[parentN];
+      if (parent) {
+        connTitle.innerHTML = '🔗 Connected · part of main quest';
+        const div = document.createElement('div');
+        div.className = 'qm-conn-parent';
+        div.innerHTML = '<b>Quest ' + parent.n + ':</b> ' + (parent.name || parent.id) + ' &nbsp;<span style="color:#6a4828;font-size:11px;">(' + (STATUS_SHORT[parent.status] || 'sealed') + ')</span>';
+        div.onclick = () => openModal(parent);
+        connBody.appendChild(div);
+        connSec.style.display = 'block';
+      } else {
+        connSec.style.display = 'none';
+      }
+    } else if (data.n && CHILDREN_BY_PARENT_N[data.n] && CHILDREN_BY_PARENT_N[data.n].length) {
+      const kids = CHILDREN_BY_PARENT_N[data.n];
+      connTitle.innerHTML = '🔗 Connected · ' + kids.length + ' side quest' + (kids.length !== 1 ? 's' : '');
+      const list = document.createElement('div');
+      list.className = 'qm-conn-list';
+      kids.forEach(k => {
+        const item = document.createElement('div');
+        item.className = 'qm-conn-item';
+        item.innerHTML =
+          '<span class="conn-dot" style="background:' + (STATUS_COLOR[k.status] || '#bbb') + '"></span>' +
+          '<span class="conn-n">#' + k.n + '</span>' +
+          '<span class="conn-name"></span>' +
+          '<span class="conn-status">' + (STATUS_SHORT[k.status] || 'sealed') + '</span>';
+        item.querySelector('.conn-name').textContent = k.name || k.id;
+        item.onclick = () => openModal(k);
+        list.appendChild(item);
+      });
+      connBody.appendChild(list);
+      connSec.style.display = 'block';
+    } else {
+      connSec.style.display = 'none';
+    }
+
+    document.getElementById('qm-open-card').href = '/' + PROJ + '/plan-card.html?q=' + encodeURIComponent(data.id);
+    qmCancelRename();
+    document.getElementById('qm-rename-btn').style.display = (data.id && data.id !== 'long-term') ? '' : 'none';
+    document.getElementById('qm-modal-backdrop').classList.add('open');
+  };
+
+  window.qmCloseModal = function() { document.getElementById('qm-modal-backdrop').classList.remove('open'); };
+  window.qmStartRename = function() {
+    if (!_current) return;
+    const inp = document.getElementById('qm-rename-input');
+    inp.value = _current.name || _current.id;
+    document.getElementById('qm-rename-edit').style.display = 'block';
+    document.getElementById('qm-rename-btn').style.display = 'none';
+    document.getElementById('qm-rename-err').style.display = 'none';
+    inp.focus(); inp.select();
+  };
+  window.qmCancelRename = function() {
+    document.getElementById('qm-rename-edit').style.display = 'none';
+    document.getElementById('qm-rename-btn').style.display = (_current && _current.id !== 'long-term') ? '' : 'none';
+    document.getElementById('qm-rename-err').style.display = 'none';
+  };
+  window.qmCommitRename = async function() {
+    if (!_current) return;
+    const newName = document.getElementById('qm-rename-input').value.trim();
+    const err = document.getElementById('qm-rename-err');
+    if (!newName) { err.textContent = 'Name cannot be empty'; err.style.display = 'block'; return; }
+    try {
+      const resp = await fetch('/api/quest/rename', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({project: PROJ, id: _current.id, name: newName})
+      });
+      const j = await resp.json();
+      if (!resp.ok || !j.ok) throw new Error(j.error || j.msg || ('HTTP ' + resp.status));
+      _current.name = newName;
+      if (QUEST_BY_ID[_current.id]) QUEST_BY_ID[_current.id].name = newName;
+      document.getElementById('qm-name').textContent = newName;
+      qmCancelRename();
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e) {
+      err.textContent = 'Rename failed: ' + e.message;
+      err.style.display = 'block';
+    }
+  };
+
+  // Click delegation
+  document.addEventListener('click', e => {
+    const g = e.target.closest('[data-quest]');
+    if (!g) return;
+    const id = g.getAttribute('data-quest');
+    const q = QUEST_BY_ID[id];
+    if (q) openModal(q); else openModal({id: id, name: id, status: 'unknown', progress: 0, tags: []});
+  });
+  document.getElementById('qm-modal-backdrop').addEventListener('click', e => { if (e.target.id === 'qm-modal-backdrop') qmCloseModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('qm-rename-edit').style.display === 'block') qmCommitRename();
+    if (e.key === 'Escape') { qmCancelRename(); qmCloseModal(); }
+  });
+
+  // ─── Hover-reveal sides + post-mount "+N" badge injection ─────────────────
+  const sidesByParentN = {};
+  document.querySelectorAll('g.qm.sq[data-parent-n]').forEach(g => {
+    const pn = g.getAttribute('data-parent-n');
+    (sidesByParentN[pn] = sidesByParentN[pn] || []).push(g);
+  });
+
+  // Inject "+N" badges into main pins based on their child count
+  document.querySelectorAll('g.qm[data-main-n]').forEach(g => {
+    const n = g.getAttribute('data-main-n');
+    const kids = (sidesByParentN[n] || []).length;
+    const slot = g.querySelector('.side-count-slot');
+    if (slot && kids > 0) {
+      // SVG-namespace-aware insertion
+      slot.innerHTML =
+        '<circle cx="32" cy="-28" r="13" fill="#fff" stroke="#2a3a4a" stroke-width="2.5"/>' +
+        '<text x="32" y="-24" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="11" fill="#2a3a4a">+' + kids + '</text>';
+    }
+  });
+
+  function show(parentN) { (sidesByParentN[parentN] || []).forEach(g => g.classList.add('reveal')); }
+  function hide(parentN) { (sidesByParentN[parentN] || []).forEach(g => g.classList.remove('reveal')); }
+
+  document.querySelectorAll('g.qm[data-main-n]').forEach(g => {
+    const n = g.getAttribute('data-main-n');
+    g.addEventListener('mouseenter', () => show(n));
+    g.addEventListener('mouseleave', () => { if (!document.body.dataset.revealAll) hide(n); });
+  });
+
+  window.showAllSides = function() {
+    Object.keys(sidesByParentN).forEach(show);
+    document.body.dataset.revealAll = '1';
+    document.getElementById('btn-show').classList.add('active');
+    document.getElementById('btn-hide').classList.remove('active');
+  };
+  window.hideAllSides = function() {
+    Object.keys(sidesByParentN).forEach(hide);
+    delete document.body.dataset.revealAll;
+    document.getElementById('btn-show').classList.remove('active');
+    document.getElementById('btn-hide').classList.add('active');
+  };
+})();
+</script>
+
+{{> _edit-modal}}
+
+</body>
+</html>

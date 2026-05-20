@@ -58,8 +58,8 @@ def notes_file(home, pid, qid):
 # ---- pure helper tests ----
 
 def test_sidecar_path_shape():
-    p = sidecar_path("apollo", "build-login")
-    assert str(p).endswith("quest/data/notes/apollo__build-login.md"), p
+    p = sidecar_path("limor", "token-anchor")
+    assert str(p).endswith("quest/data/notes/limor__token-anchor.md"), p
     print("PASS: sidecar_path returns <...>/notes/<proj>__<quest>.md")
 
 

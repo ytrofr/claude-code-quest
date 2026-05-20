@@ -17,19 +17,7 @@ RULE = Path.home() / ".claude" / "rules" / "projects" / "quest-dashboard.md"
 SKILL = Path(__file__).parent / "SKILL.md"
 
 
-def _skip_if_no_rule() -> bool:
-    """The always-on rule is part of the user's ~/.claude setup, not shipped in
-    this engine repo. On a fresh clone it won't exist — skip the rule-layer
-    checks gracefully (SKILL.md checks still run)."""
-    if not RULE.exists():
-        print(f"SKIP: always-on rule not present ({RULE}) — not part of the engine repo")
-        return True
-    return False
-
-
 def test_rule_documents_sidecar_path():
-    if _skip_if_no_rule():
-        return
     body = RULE.read_text(encoding="utf-8")
     assert "quest/data/notes/" in body, "always-on rule must name the sidecar path"
     assert "autosync-immune" in body or "autosync never" in body.lower(), (
@@ -39,8 +27,6 @@ def test_rule_documents_sidecar_path():
 
 
 def test_rule_has_todo_write_triggers():
-    if _skip_if_no_rule():
-        return
     body = RULE.read_text(encoding="utf-8").lower()
     assert "todo add" in body, "rule must carry the `todo add` trigger"
     assert "remind me" in body, "rule must carry the 'remind me to X on quest Y' trigger"
@@ -48,8 +34,6 @@ def test_rule_has_todo_write_triggers():
 
 
 def test_rule_has_backlog_read_triggers():
-    if _skip_if_no_rule():
-        return
     body = RULE.read_text(encoding="utf-8").lower()
     for phrase in ("backlog", "task list", "what's left"):
         assert phrase in body, f"rule missing backlog-read trigger phrase: {phrase!r}"
