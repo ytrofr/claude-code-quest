@@ -72,8 +72,8 @@ quest_indicator() {
   # Tier 2: auto-detect from cwd (only if no explicit claim).
   # Match a path_map prefix when cwd is exactly the prefix OR starts with
   # `prefix` followed by a separator (`/`, `-`, `_`). Lets one entry like
-  # `/home/me/my-project` match all sibling worktrees `my-project-feature`,
-  # `my-project-staging`, etc., while still rejecting `my-project2` / `my-projectxyz`.
+  # `/home/ytr/LimorAI` match all sibling worktrees `LimorAI-Limor`,
+  # `LimorAI-staging`, etc., while still rejecting `LimorAI2` / `LimorAIxyz`.
   if [ -z "$project" ] && [ -r "$config" ]; then
     project=$(jq -r --arg cwd "$cwd" '
       .path_map // [] | map(select(.path as $p |
@@ -97,8 +97,75 @@ quest_indicator() {
     fi
   fi
 
-  # If we have a project but no qid, try most-recent-current quest
-  if [ -n "$project" ] && [ -z "$qid" ] && [ -r "$data" ]; then
+  # Validate the claimed quest still exists AND is status=current. Without
+  # this, a stale Tier 1 claim that points to a now-locked / now-done quest
+  # silently overrides the auto-detect path → statusline shows the wrong
+  # quest indefinitely. Discard the claim and fall through to Tier 2 (most-
+  # recent-current auto-detect).
+  # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
+  # operator was on dorian-investors-landing. 2026-05-15 OGAS — same shape
+  # recurred with moshytz-variant-engine creation: the prior session-key claim
+  # outlived the work-context pivot. This fix + auto-claim on /quest update
+  # --status current (quest.py cmd_update) together close the recurrence.
+  if [ -n "$project" ] && [ -n "$qid" ] && [ -r "$data" ]; then
+    local _quest_status
+    _quest_status=$(jq -r --arg p "$project" --arg q "$qid" \
+      '(.projects[$p].quests // []) | map(select(.id == $q)) | .[0].status // ""' \
+      "$data" 2>/dev/null)
+    if [ "$_quest_status" != "current" ]; then
+      qid=""  # discard stale claim; Tier 2 takes over
+    fi
+  fi
+
+  # Sustained-drift discard (T5): when the session-name canary mismatch has
+  # persisted beyond QUEST_MISMATCH_DISCARD_SEC, the Tier-1 claim is almost
+  # certainly stale — discard it AND skip Tier-2 auto-detect, so the statusline
+  # shows "⚠ <project>/-" (honest "claim wrong, real quest unknown") rather
+  # than a confidently-wrong quest. A timestamp file tracks first-seen
+  # mismatch; a brief mismatch (one tick, oddly-named session) never trips it.
+  # Honors the URL-autoclaim canary-suppression sentinel. Disable with
+  # QUEST_MISMATCH_DISCARD_SEC=0.
+  local _drift_discard=0
+  local _discard_sec="${QUEST_MISMATCH_DISCARD_SEC:-1800}"
+  if [ -n "$sk" ] && [ -n "$project" ] && [ -n "$qid" ] \
+     && [ "$_discard_sec" -gt 0 ] 2>/dev/null; then
+    local _sn_slug=""
+    [ -n "$session_name" ] && _sn_slug=$(_qd_kebab "$session_name")
+    local _mismatch=0
+    if [ -n "$_sn_slug" ] && [ "$_sn_slug" != "$qid" ]; then
+      case "$qid" in
+        *"$_sn_slug"*) ;;
+        *) case "$_sn_slug" in
+             *"$qid"*) ;;
+             *) _mismatch=1 ;;
+           esac ;;
+      esac
+    fi
+    local _ms_file="$run_dir/session-$sk.quest-mismatch-since"
+    local _canary2="$run_dir/session-$sk.canary-suppressed-until"
+    local _now2; _now2=$(date +%s)
+    if [ -r "$_canary2" ]; then
+      local _cu; _cu=$(head -c 32 "$_canary2" 2>/dev/null | tr -d '\r\n')
+      [ -n "$_cu" ] && [ "$_cu" -gt "$_now2" ] 2>/dev/null && _mismatch=0
+    fi
+    if [ "$_mismatch" = "1" ]; then
+      local _since=""
+      [ -r "$_ms_file" ] && _since=$(head -c 32 "$_ms_file" 2>/dev/null | tr -d '\r\n')
+      if [ -z "$_since" ] || ! [ "$_since" -gt 0 ] 2>/dev/null; then
+        printf '%s\n' "$_now2" > "$_ms_file" 2>/dev/null
+      elif [ "$((_now2 - _since))" -ge "$_discard_sec" ]; then
+        qid=""            # sustained drift — discard stale claim
+        _drift_discard=1
+      fi
+    else
+      rm -f "$_ms_file" 2>/dev/null
+    fi
+  fi
+
+  # If we have a project but no qid, try most-recent-current quest. Skipped
+  # when the qid was discarded for sustained drift — D2: show "<project>/-",
+  # never auto-pick another (likely also-wrong) quest.
+  if [ -n "$project" ] && [ -z "$qid" ] && [ "$_drift_discard" != "1" ] && [ -r "$data" ]; then
     qid=$(jq -r --arg p "$project" '
       .projects[$p].quests // [] |
       map(select(.status == "current")) |
@@ -121,15 +188,52 @@ quest_indicator() {
     if [ -n "$sname_slug" ] && [ "$sname_slug" != "$qid" ]; then
       suffix=" · $sname_slug"
     fi
+    # Stale-claim canary: if the CC session name (--name) doesn't substring-
+    # match the claimed quest id in either direction, prefix the tag with a
+    # warning glyph. Catches long-running sessions whose claim drifted from
+    # the current work topic. Disable with QUEST_STATUSLINE_MISMATCH_WARN=0.
+    # Evidence: 2026-05-14 OGAS — session named "dorian" stayed bound to
+    # quest entry-460-real-ig-gallery-and-v3-scroll-extract for 2 days; this
+    # glyph would have surfaced the mismatch instantly.
+    # Canary-suppression sentinel: when ~/.claude/hooks/quest-url-rebind.sh
+    # just hard-rebound via plan-card URL paste, the session-name canary fires
+    # a false-positive (operator intentionally changed quest, no drift to
+    # report). Skip ⚠ paint for 5min after URL auto-claim.
+    # Cross-ref: feedback_quest_reclaim_on_topic_shift_2026-05-15.md.
+    local _suppress_canary=0
+    local _canary_file="$run_dir/session-$sk.canary-suppressed-until"
+    if [ -n "$sk" ] && [ -r "$_canary_file" ]; then
+      local _canary_until _now
+      _canary_until=$(head -c 32 "$_canary_file" 2>/dev/null | tr -d '\r\n')
+      _now=$(date +%s)
+      if [ -n "$_canary_until" ] && [ "$_canary_until" -gt "$_now" ] 2>/dev/null; then
+        _suppress_canary=1
+      fi
+    fi
+    local prefix=""
+    if [ "$_suppress_canary" != "1" ] \
+       && [ "${QUEST_STATUSLINE_MISMATCH_WARN:-1}" != "0" ] \
+       && [ -n "$sname_slug" ] && [ "$sname_slug" != "$qid" ]; then
+      case "$qid" in
+        *"$sname_slug"*) ;;  # session name contained in quest id → match
+        *) case "$sname_slug" in
+             *"$qid"*) ;;  # quest id contained in session name → match
+             *) prefix="⚠ " ;;  # no substring overlap → stale claim suspected
+           esac ;;
+      esac
+    fi
     # Tag = bare project/qid + optional session suffix. URL is in the OSC-8
     # hyperlink escape (one-click on modern terminals); plaintext URL trailer
     # dropped to keep line 2 short enough for narrow terminals.
-    tag="${base}${suffix}"
+    tag="${prefix}${base}${suffix}"
   elif [ -n "$project" ]; then
     url="$dashboard/$project/"
     base="$project/-"
     [ -n "$sname_slug" ] && suffix=" · $sname_slug"
-    tag="${base}${suffix}"
+    # Sustained-drift discard surfaces the ⚠ glyph here (qid was nulled above).
+    local _drift_prefix=""
+    [ "$_drift_discard" = "1" ] && _drift_prefix="⚠ "
+    tag="${_drift_prefix}${base}${suffix}"
   else
     url="$dashboard/"
     base="-"

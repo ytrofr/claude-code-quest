@@ -173,6 +173,29 @@ class TestDecideAction(unittest.TestCase):
             self.assertNotEqual(r["top"], "mobile-layout-iframe-cache",
                                 "Conflict guard failed: rebound to context-favorite while user said dorian")
 
+    def test_rc1_rebind_margin_floor_is_five(self):
+        # RC1: REBIND_MARGIN raised 3->5. The observed production noise rebind
+        # (score 5.56 / margin 3.3) cleared the old margin=3 floor on the
+        # user-alone path. Regression guard on the constant.
+        self.assertGreaterEqual(scorer.REBIND_MARGIN, 5.0)
+
+    def test_rc2_dominant_context_overrides_conflict_guard(self):
+        # RC2: user prompt weakly signals quest A, but joined context
+        # overwhelmingly dominates toward B -> rebind to B (not suggest-only).
+        # Crafted docs/idf for scale-independent precision (nonsense tokens).
+        docs = [
+            ("qa", {"quaffle"}),
+            ("qb", {"nargle", "thestral", "bowtruckle", "wrackspurt"}),
+        ]
+        idf = {"quaffle": 4.0, "nargle": 9.0, "thestral": 9.0,
+               "bowtruckle": 9.0, "wrackspurt": 9.0}
+        r = scorer.decide_action(
+            "quaffle", "nargle thestral bowtruckle wrackspurt", docs, idf,
+        )
+        self.assertEqual(r["action"], "rebind")
+        self.assertEqual(r["top"], "qb")
+        self.assertEqual(r["path"], "conflict-override")
+
     def test_locked_and_done_quests_never_picked(self):
         # The fixture has a "locked-old-feature" and "done-old-quest" — neither
         # should appear in scoring because docs filter to status='current'.
@@ -331,6 +354,19 @@ class TestEndToEnd(unittest.TestCase):
         self._run("investigate", cwd="/totally/unrelated/path")
         e = self._last_log()
         self.assertEqual(e["acted"], "no-project")
+
+    def test_rc4_task_notification_prompt_skipped(self):
+        # RC4: <task-notification> blobs are harness-injected subagent
+        # completion messages, not user intent — must not drive a rebind.
+        self._run(
+            "<task-notification>\n<task-id>babc123</task-id>\n<summary>"
+            "investigate mobile iframe cache viewport regression</summary>"
+        )
+        e = self._last_log()
+        self.assertEqual(e["acted"], "skipped_task_notification")
+        self.assertEqual(e["action"], "skip")
+        cf = self.quest_root / "run" / "session-testpid-testticks.quest"
+        self.assertFalse(cf.exists(), "task-notification must not write a claim")
 
     def test_same_claim_no_op(self):
         cf = self.quest_root / "run" / "session-testpid-testticks.quest"

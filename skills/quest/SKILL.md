@@ -69,7 +69,7 @@ Priority for new quest `name`:
 2. **Plan H1**: if the work has a plan file (`~/.claude/plans/*.md` or project `plans/`), extract the H1. Accept both `# Plan: <title>` and bare `# <title>` shapes. `name = <title>`. `id` = kebab-case of `name`.
 3. **No plan AND no operator name**: ASK the operator for the canonical title BEFORE creating. Do NOT auto-derive from session-internal jargon (`§23`, `Phase 7B`, `Wave 15a`, `Bundle F3`, etc.) — that's not user-facing identity.
 
-**Forbidden**: deriving the `id` from the plan FILE name. Plan `i-want-to-plan-pending-layout-queue.md` → BAD id `i-want-to-plan-pending-layout-queue`. The file name is the prompt that birthed the plan; the H1 is the title.
+**Forbidden**: deriving the `id` from the plan FILE name. Plan `~/.claude/plans/i-want-to-plan-pending-layout-queue.md` → BAD id `i-want-to-plan-pending-layout-queue`. The file name is the prompt that birthed the plan; the H1 is the title.
 
 **Autosync exception — the file-name DOES become the id.** `autosync` (fired on any write of a plan file carrying `**Project**: <id>`) creates a quest whose `id` = kebab of the plan **file name** — the one path that violates the rule above. Consequence: writing a plan file AND hand-creating a quest with a different id → autosync spawns a DUPLICATE stub (missing kpi/why/next_step). **Mitigation**: name the plan FILE to match your intended quest `id`. If they already diverged, `mv` the file to match, then delete the stub (destructive — operator OK per I1). Evidence: OGAS 2026-05-14 — `moshytz-variant-engine-multi-model.md` auto-spawned a dup of the hand-built `moshytz-variant-engine`; fixed by renaming the file.
 
