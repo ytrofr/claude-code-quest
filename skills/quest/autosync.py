@@ -951,12 +951,48 @@ def autosync(plan_path: Path) -> None:
     render_now()
 
 
+def report_quest_state(plan_path: Path) -> None:
+    """Print one machine-readable QUEST_SYNC line to stdout for an integrating host.
+
+    Re-resolves project + quest from the (post-sync) quests.json so a caller
+    (e.g. a documentation / session-wrap workflow) can decide whether to ASK
+    the operator to close a quest that just reached 100%. Only emitted under
+    the `--report` flag — the PostToolUse hook path runs without it, keeping
+    hook stdout clean.
+
+    Line format: `QUEST_SYNC project=<p> id=<q> progress=<0.0-1.0> status=<s>`
+    Silent on any miss (not plan-shaped, no project, no quest) — never raises."""
+    try:
+        project_id = detect_project(plan_path)
+        if not project_id or not DATA.exists():
+            return
+        data = json.loads(DATA.read_text(encoding="utf-8"))
+        project = data.get("projects", {}).get(project_id)
+        if not project:
+            return
+        qid = slug(plan_path.stem)
+        quests = project.get("quests", [])
+        q = next((x for x in quests if x.get("id") == qid), None)
+        if q is None:
+            q = next((x for x in quests if x.get("plan") == plan_path.name), None)
+        if q is None:
+            return
+        print(f"QUEST_SYNC project={project_id} id={q.get('id')} "
+              f"progress={q.get('progress', 0) or 0} status={q.get('status')}")
+    except Exception as e:
+        log_msg(f"WARN report_quest_state: {e}")
+
+
 def main() -> int:
-    if len(sys.argv) < 2:
+    # First non-flag arg is the plan path; `--report` opts into the
+    # QUEST_SYNC stdout line (used by /document, not by the hook).
+    pos_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    report = "--report" in sys.argv[1:]
+    if not pos_args:
         log("ERROR no plan path argument")
         return 0
 
-    plan_path = Path(sys.argv[1]).expanduser().resolve()
+    plan_path = Path(pos_args[0]).expanduser().resolve()
 
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -965,6 +1001,8 @@ def main() -> int:
                 fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 log(f"SKIP locked (concurrent autosync) for {plan_path}")
+                if report:
+                    report_quest_state(plan_path)
                 return 0
             try:
                 autosync(plan_path)
@@ -973,6 +1011,8 @@ def main() -> int:
     except Exception as e:
         log(f"ERROR lock: {e}")
 
+    if report:
+        report_quest_state(plan_path)
     return 0
 
 

@@ -2,6 +2,14 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.14.0] — 2026-05-21
+
+`autosync.py` can now report the state of the quest it just synced — so an integrating workflow can offer to close a quest the moment it reaches 100%.
+
+### Added
+
+- **`autosync.py --report` flag.** After syncing, autosync re-resolves the affected quest and prints one machine-readable line to stdout — `QUEST_SYNC project=<p> id=<q> progress=<0.0-1.0> status=<s>`. A host workflow that runs autosync (e.g. a session-wrap or documentation step) can read this line and prompt the operator to close a quest whose post-validation checklist just hit 100%. The PostToolUse plan-write hook runs autosync **without** the flag, so hook stdout stays clean and unchanged. autosync still never flips `status` itself — closing a quest remains an explicit operator action via `/quest done`.
+
 ## [1.13.1] — 2026-05-20
 
 Fix release. v1.13.0's prompt-rebind changes plus a new statusline behavior combined into a regression where every session's statusline collapsed to the project homepage. Both causes fixed.
