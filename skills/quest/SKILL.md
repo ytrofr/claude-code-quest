@@ -247,6 +247,7 @@ All three failure modes encoded into I1/I2/I3.
 | Command                                                | What it does                                                                                       |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `/quest status`                                        | Print all projects, dashboard URL, theme list                                                      |
+| `/quest hygiene [project]`                             | Read-only noise audit: DUP-RISK collisions, stub quests, codename names (see Hygiene Cleanup Routine) |
 | `/quest init <project>`                                | Create new project entry                                                                           |
 | `/quest add <project> "<name>"`                        | Append a quest                                                                                     |
 | `/quest update <project> <quest>`                      | Patch progress, next step, name, links, etc.                                                       |
@@ -560,6 +561,56 @@ Read-only — like the Resume Routine, but for "show me the work." Triggered by 
 2. **Read** `quests.json` + the My To-Do sidecar file(s).
 3. **Present the consolidated picture** — My To-Do (open + done counts, open items), the plan-derived sections (Your Actions / Claude's Actions / Deeds) current state, and `next_step`. For a project-scope ask, repeat for every `current` (and optionally `locked`) quest.
 4. **Read-only** — never mutates. Safety Invariant I1 untouched.
+
+## 🧹 Hygiene Cleanup Routine — De-Noise the Roadmap
+
+The map accumulates noise because `autosync` creates a quest on every plan-file write (its `id` = the plan-file slug; before the H1-naming patch its `name` was that codename too). Two failure modes result: (a) a **codename dup-stub** when a hand-named quest already covers the same plan, (b) **shipped work left `current`/`locked`** because the §13 checkboxes were never ticked.
+
+### NL triggers
+
+- "clean up the quests / too many quest cards / which are duplicates / clear the noise" → this routine
+- "audit the quests" / "what's actually done but not marked" → this routine
+
+### Step 0 — DETECT (read-only)
+
+```bash
+quest hygiene <project>     # one project
+quest hygiene               # all projects
+```
+
+Reports four buckets: **DUP-RISK** plan collisions (codename stub + real twin on one plan), **MULTI-QUEST** collisions (a plan that intentionally spawns several hand-named sub-quests — NOT noise, never touch), **STUB** quests (0% + empty next_step + missing why/kpi/tasks), **CODENAME** names. Also: `scripts/maintenance/quest_hygiene_audit.py` in a project repo (`--json`, `--strict` gate) is the standalone equivalent.
+
+### The 4 classes + the SAFE action for each
+
+| Class | Signal | Action | Gate |
+|---|---|---|---|
+| **Shipped-not-done** | `current`/`locked`, but git/ACTIVE.md/live-prod prove it shipped | `quest done <proj> <id>` | Mark done ONLY with **evidence** (commit sha / entry doc / live toggle) — NEVER on name or vibe. `done` won't promote a locked quest while other currents exist. |
+| **DUP-RISK dup-stub** | codename stub + real twin share one plan | **merge** any unique `why`/`kpi`/desc/tasks/links the twin LACKS into the twin, THEN remove the stub entry from `quests.json` | **I1 — destructive.** Operator must explicitly authorize. Back up `quests.json` first. Verify no `depends_on` references the stub. |
+| **Codename name** (real work) | codename `name`, but live/active | rename `name` → plan **H1 title** (`quest update <proj> <id> --name "<H1>"`). Display-only; keep `id` (URLs/claims/deps stable). | Safe — non-destructive. |
+| **Orphan stub** | codename + 0% + no twin | investigate plan + git: shipped → mark done; superseded/abandoned → retire (I1); real-pending → leave or rename | retire = **I1**; leave/rename = safe |
+
+### Hard invariants (what made this safe in practice)
+
+1. **MULTI-QUEST ≠ noise** — a plan that deliberately spawns sub-quests (e.g. a master plan with N tracks) shows as a collision but has zero stubs. Never dedup it.
+2. **Evidence before `done`** — a 0% quest is "actually done" only if a commit / entry doc / live prod toggle proves it. Name similarity is not evidence.
+3. **Merge before remove** — a dup-stub may carry a `why`/`kpi`/desc the twin lacks. Salvage into the twin first, then delete.
+4. **Every removal/retire is I1-gated** — operator explicitly names the project + a destructive verb (remove/retire/delete). Ambient "clean it up" is NOT authorization to delete; it IS enough to mark-done shipped work + rename codenames (both non-destructive).
+5. **Renames are display-only** — change `name`, never `id`. The `id` anchors claim files, plan-card URLs, and `depends_on`.
+6. **Back up + verify deps** — `cp quests.json quests.json.bak-<ts>` before any removal; confirm no quest's `depends_on` points at a removed id.
+
+### Recurrence prevention (already in place)
+
+- `derive_quest` names new quests from the plan **H1** (not the codename) — fewer codename names going forward.
+- The `knowledge-quest-hygiene` weekly routine (OGAS Routines Platform) re-flags DUP-RISK + codename counts so noise self-surfaces.
+- **Best fix is upstream**: name the plan FILE to match the intended quest `id` so autosync UPDATES the right quest instead of spawning a twin (Safety Invariant I2).
+
+### Forbidden during this routine
+
+- DON'T dedup a MULTI-QUEST collision.
+- DON'T mark a quest `done` without shipped-evidence.
+- DON'T remove/retire anything without explicit I1 authorization.
+- DON'T rename a quest's `id` (only `name`).
+- DON'T run `quest reset --chapter` to "clean up" — it archives ALL done+current (sparing only locked) and will nuke in-flight work. This routine is surgical; chapter-reset is not.
 
 ## Icon system — modular UI components
 

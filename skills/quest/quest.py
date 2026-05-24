@@ -1173,6 +1173,104 @@ def cmd_mine(args) -> int:
     return 0
 
 
+# ---- hygiene (read-only noise audit) ----
+
+# A "codename" name is the random plan-file slug autosync assigned before the
+# H1-naming patch (derive_quest now prefers the plan H1). A dup-stub is a
+# codename-id quest at 0% with empty next_step co-existing with a real twin on
+# the same plan file. See SKILL.md § Hygiene Cleanup Routine.
+_CODENAME_RE = re.compile(
+    r"^(I Want|Yes |Plan This|Create A|Create Quest|Read \d|Update The|I Noticed|Im Often)\b"
+    r"|\b(Beforew|Wild Nest|Misty Reddy|Fuzzy Anchor|Dazzling|Marinating|Crunching|"
+    r"Swimming Lerdorf|Merry Flurry|Fluffy Beaver|Purrfect Valiant|Glowing Shamir|"
+    r"Mellow Kernighan|Snug Horizon|Delegated Orbit|Quirky Steele|Foraging Yao|"
+    r"Leaping Starfish|Hatching Dream|Dynamic Manatee|Bouncing Fermat|Vectorized Origami)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_dup_stub(q: dict, plan_stem: str) -> bool:
+    return (
+        q.get("id") == slug(plan_stem)
+        and (q.get("progress") or 0) == 0
+        and not (q.get("next_step") or "").strip()
+        and bool(_CODENAME_RE.search(q.get("name", "")))
+    )
+
+
+def _hygiene_project(pid: str, quests: list) -> dict:
+    """Read-only noise report for one project. Classifies plan-file collisions
+    as DUP-RISK (codename stub + real twin) vs MULTI-QUEST (intentional)."""
+    from collections import defaultdict
+
+    byplan: dict[str, list] = defaultdict(list)
+    for q in quests:
+        plan = (q.get("plan") or "").split("/")[-1]
+        if plan:
+            byplan[plan].append(q)
+    dup_risk, multi = [], []
+    for plan, group in sorted(byplan.items()):
+        if len(group) <= 1:
+            continue
+        stem = plan[:-3] if plan.endswith(".md") else plan
+        stubs = [q for q in group if _is_dup_stub(q, stem)]
+        entry = {"plan": plan, "quests": group, "stubs": stubs}
+        (dup_risk if (stubs and len(group) > len(stubs)) else multi).append(entry)
+    stubs = [
+        q for q in quests
+        if q.get("status") in ("current", "locked")
+        and (q.get("progress") or 0) == 0
+        and not (q.get("next_step") or "").strip()
+        and (not (q.get("why") or "").strip() or not (q.get("kpi") or "").strip()
+             or not (q.get("tasks") or q.get("actions")))
+    ]
+    codenames = [q for q in quests
+                 if q.get("status") in ("current", "locked")
+                 and _CODENAME_RE.search(q.get("name", ""))]
+    return {"project": pid, "dup_risk": dup_risk, "multi": multi,
+            "stubs": stubs, "codenames": codenames, "total": len(quests)}
+
+
+def cmd_hygiene(args) -> int:
+    """Read-only quest-noise audit. NEVER mutates. Acting on findings is the
+    operator-gated Hygiene Cleanup Routine (SKILL.md)."""
+    data = load()
+    projects = data.get("projects", {})
+    targets = [args.project_id] if args.project_id else list(projects)
+    any_dirty = False
+    for pid in targets:
+        if pid not in projects:
+            print(f"SKIP: project '{pid}' not found", file=sys.stderr)
+            continue
+        rep = _hygiene_project(pid, projects[pid].get("quests", []))
+        d, m = rep["dup_risk"], rep["multi"]
+        print(f"\n{'='*58}\nQUEST HYGIENE — {pid} ({rep['total']} quests)\n{'='*58}")
+        print(f"\n[1] PLAN COLLISIONS: {len(d)} DUP-RISK | {len(m)} multi-quest (ok)")
+        for item in d:
+            print(f"    ! DUP-RISK  {item['plan']}")
+            for q in item["quests"]:
+                mark = "  <-- stub" if q in item["stubs"] else ""
+                print(f"       #{q.get('n','?'):<4}[{q.get('status','?'):<7}]"
+                      f"{int(100*(q.get('progress') or 0)):>3}%  {q['id']}{mark}")
+        for item in m:
+            ids = ", ".join(f"#{q.get('n','?')}" for q in item["quests"])
+            print(f"      ok MULTI    {item['plan']} ({ids})")
+        print(f"\n[2] STUB QUESTS: {len(rep['stubs'])}")
+        for q in rep["stubs"]:
+            print(f"    #{q.get('n','?'):<4}[{q.get('status','?'):<7}] {q['id']}")
+        print(f"\n[3] CODENAME NAMES: {len(rep['codenames'])}")
+        for q in rep["codenames"]:
+            print(f"    #{q.get('n','?'):<4} {q['id']:<42} name={q.get('name','')!r}")
+        print(f"\n[4] done-not-archived (info): "
+              f"{sum(1 for q in projects[pid].get('quests', []) if q.get('status')=='done')}")
+        if d or rep["stubs"] or rep["codenames"]:
+            any_dirty = True
+    if any_dirty:
+        print("\n→ To act on these, follow SKILL.md § Hygiene Cleanup Routine "
+              "(every removal is operator-gated per Safety Invariant I1).")
+    return 0
+
+
 # ---- argparse setup ----
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1181,6 +1279,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("status", help="Print state of all projects + dashboard URL")
     s.set_defaults(func=cmd_status)
+
+    s = sub.add_parser("hygiene", help="Read-only noise audit: dup-stubs, plan collisions, codename names")
+    s.add_argument("project_id", nargs="?", default=None, help="project (default: all)")
+    s.set_defaults(func=cmd_hygiene)
 
     s = sub.add_parser("init", help="Create a new project")
     s.add_argument("project_id")
