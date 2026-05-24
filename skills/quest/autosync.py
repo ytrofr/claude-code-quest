@@ -636,9 +636,36 @@ def get_git_meta(plan_path: Path) -> dict:
         return {}
 
 
+_H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
+
+
+def extract_h1_title(text: str) -> str | None:
+    """Return a human-recognizable quest name from the plan's H1.
+
+    Plans follow `# Plan: <title>` or bare `# <title>` (see plan-link.md).
+    Strips the `Plan:` prefix and caps length so the quest carries a real
+    title (e.g. "Total Cost Observability") instead of the random plan-file
+    codename ("i-noticed-in-https-..."). Returns None if no usable H1.
+    """
+    m = _H1_RE.search(text or "")
+    if not m:
+        return None
+    title = m.group(1).strip()
+    title = re.sub(r"^Plan:\s*", "", title, flags=re.IGNORECASE).strip()
+    # Drop markdown link/emphasis noise; collapse whitespace.
+    title = re.sub(r"[`*_]", "", title).strip()
+    if not title:
+        return None
+    return title[:90]
+
+
 def derive_quest(plan_path: Path, n: int) -> dict:
     """Build a quest dict from a plan file. Lean desc (≤140 char) +
-    problem/solution/why/depends_on lifted from BLUF when present."""
+    problem/solution/why/depends_on lifted from BLUF when present.
+
+    `name` prefers the plan's H1 title (recognizable); falls back to the
+    de-prefixed, title-cased file stem only when the plan has no H1.
+    """
     name = plan_path.stem
     # Strip leading "1-" / "2026-05-07-" style prefixes for display
     display_name = re.sub(r"^\d+[-_]", "", name).replace("-", " ").replace("_", " ").title()
@@ -658,6 +685,9 @@ def derive_quest(plan_path: Path, n: int) -> dict:
 
     try:
         text = plan_path.read_text(encoding="utf-8", errors="ignore")
+        h1 = extract_h1_title(text)
+        if h1:
+            quest["name"] = h1
         quest["desc"] = derive_lean_desc(text)
         bluf = extract_bluf(text)
         for k in ("problem", "solution", "why", "depends_on"):
