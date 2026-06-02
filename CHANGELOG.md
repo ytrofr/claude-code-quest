@@ -2,6 +2,24 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.15.0] — 2026-06-02
+
+Master Quest View becomes the **canonical multi-surface presentation** for any project that defines `epics` + `master_view_enabled` — it now governs the route map and the plan-card picker, not just the quest log. Plus a name-cleanup routine for tidy quest titles.
+
+### Added
+
+- **Master view drives all three dashboard surfaces.** Define `epics[]` (+ tag each quest with `epic`) and the route map shows one clean landmark per master (with a sub-quest count badge + rolled-up progress, no more colliding `n`-keyed pins), the quest-log opens to the master board, and the plan-card active-picker collapses to the master quests. A route-map pin click-throughs to `quest-log.html#epic-<id>`, which auto-opens that master's popup.
+- **Pretty project routing.** `http://localhost:8770/<project>/` now serves that project's `route.html` (the overworld map); root `/` still serves the global index. (`server.py`)
+- **`name_cleanup.py`** — scan/preview/apply routine to rename machine-generated/codename quest titles to short thematic names (display `name` only; `id` + `desc` untouched), with an HTML before/after eyeball gate.
+
+### Fixed
+
+- **Master-view / popup progress bars now fill by percent.** The popup + grid progress-fill elements were inline `<span>`s, so `width`/`height` never applied and 0% looked identical to 100%. They're `display:block` now. (`master_view.py`)
+
+### Reversibility
+
+- Every surface falls back cleanly: `master_view_enabled: false` (per-project) or `~/.claude/quest/master-view-disabled` (global) reverts the quest-log to flat, the route map to legacy `n`-keyed pins, and the picker to the full current-quest list. A project without `epics` is entirely unaffected. The route-map override is applied to the route view's scope only — quest-log and plan-card are never mutated.
+
 ## [1.14.0] — 2026-05-21
 
 `autosync.py` can now report the state of the quest it just synced — so an integrating workflow can offer to close a quest the moment it reaches 100%.

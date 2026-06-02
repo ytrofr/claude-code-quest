@@ -223,6 +223,15 @@ class QuestHandler(SimpleHTTPRequestHandler):
         if path.startswith("/api/file/"):
             self._handle_file_get(path)
             return
+        # Pretty project route: /<project>/ -> /<project>/route.html (the
+        # overworld map). Root "/" still serves the global Trainer-Hall index;
+        # only a single-segment directory request rewrites.
+        seg = [p for p in path.split("/") if p]
+        if path.endswith("/") and len(seg) == 1:
+            if (SITE_DIR / seg[0] / "route.html").exists():
+                rest = self.path.split("?", 1)
+                qs = f"?{rest[1]}" if len(rest) > 1 else ""
+                self.path = f"/{seg[0]}/route.html{qs}"
         # Fall through to static
         super().do_GET()
 

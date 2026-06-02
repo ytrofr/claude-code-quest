@@ -1243,29 +1243,120 @@ def _render_quest_blocks(project: dict, theme: str) -> tuple[str, str, str]:
     )
     default_qid = default_q.get("id", "") if default_q else ""
 
-    # Active picker — only render if 2+ current quests exist (single-current is
-    # the legacy case and doesn't need a picker bar).
-    currents = [q for q in quests if q.get("status") == "current"]
-    if len(currents) >= 2:
+    # Active picker. With master-view, collapse the bar to the MASTER quests
+    # (one entry per epic that has an active sub-quest) instead of listing every
+    # current quest — clicking a master jumps to its lead active sub-quest.
+    # Projects without epics keep the legacy "list every current quest" bar.
+    epics = project.get("epics", [])
+    picker = ""
+    if project.get("master_view_enabled") and epics:
+        by_epic: dict[str, list] = {}
+        for q in quests:
+            e = q.get("epic")
+            if e:
+                by_epic.setdefault(e, []).append(q)
         items = []
-        for q in currents:
-            qid = html.escape(q.get("id", ""), quote=True)
-            label = html.escape(f"#{q.get('n','?')} {q.get('name','?')}", quote=True)
-            items.append(
-                f'<a href="plan-card.html?q={qid}" data-qid="{qid}">{label}</a>'
+        for ep in epics:
+            members = by_epic.get(ep.get("id"), [])
+            currents_in = [m for m in members if m.get("status") == "current"]
+            if not currents_in:
+                continue
+            lead = currents_in[0]
+            qid = html.escape(lead.get("id", ""), quote=True)
+            label = html.escape(
+                f"{ep.get('name', ep.get('id',''))} ({len(currents_in)})", quote=True
             )
-        picker = (
-            '<nav class="qd-active-picker" aria-label="Active quests">'
-            '<span class="qd-active-picker-label">'
-            f'⚔ {len(currents)} active</span>'
-            '<span class="qd-active-picker-list">'
-            + "".join(items)
-            + "</span></nav>"
-        )
+            items.append(f'<a href="plan-card.html?q={qid}" data-qid="{qid}">{label}</a>')
+        if items:
+            picker = (
+                '<nav class="qd-active-picker" aria-label="Master quests">'
+                '<span class="qd-active-picker-label">'
+                f'⚔ {len(items)} master quests</span>'
+                '<span class="qd-active-picker-list">'
+                + "".join(items)
+                + "</span></nav>"
+            )
     else:
-        picker = ""
+        currents = [q for q in quests if q.get("status") == "current"]
+        if len(currents) >= 2:
+            items = []
+            for q in currents:
+                qid = html.escape(q.get("id", ""), quote=True)
+                label = html.escape(f"#{q.get('n','?')} {q.get('name','?')}", quote=True)
+                items.append(
+                    f'<a href="plan-card.html?q={qid}" data-qid="{qid}">{label}</a>'
+                )
+            picker = (
+                '<nav class="qd-active-picker" aria-label="Active quests">'
+                '<span class="qd-active-picker-label">'
+                f'⚔ {len(currents)} active</span>'
+                '<span class="qd-active-picker-list">'
+                + "".join(items)
+                + "</span></nav>"
+            )
 
     return "\n".join(blocks), picker, json.dumps(default_qid)
+
+
+def _epic_route_mains(project: dict, theme: str) -> list[dict]:
+    """Synthetic main-quest pins for the route map — one per epic (master).
+
+    Returns [] unless the project opts into master view AND has epics. When it
+    does, the road shows clean master landmarks (≤9, short names → no label
+    overlap) instead of the n-keyed real quests, which collide and surface stale
+    old #1..#9 quests as the "mains". Each pin clicks to quest-log.html#epic-<id>.
+    Route-view only — never mutates the shared project scope."""
+    epics = project.get("epics", [])
+    if not (project.get("master_view_enabled") and epics):
+        return []
+    try:
+        positions = json.loads(
+            (THEMES / theme / "theme.json").read_text(encoding="utf-8")
+        ).get("positions", {})
+    except Exception:
+        positions = {}
+    pos_keys = list(positions.keys())
+    if not pos_keys:
+        return []
+    by_epic: dict[str, list] = {}
+    for q in project.get("quests", []):
+        e = q.get("epic")
+        if e:
+            by_epic.setdefault(e, []).append(q)
+    syn = []
+    for i, ep in enumerate(epics):
+        members = by_epic.get(ep.get("id"), [])
+        if not members or i >= len(pos_keys):
+            continue
+        roll = sum(m.get("progress", 0) for m in members) / len(members)
+        if any(m.get("status") == "current" for m in members):
+            status = "current"
+        elif all(m.get("status") == "done" for m in members):
+            status = "done"
+        else:
+            status = "locked"
+        ename = ep.get("name", ep.get("id", ""))
+        label_w = max(80, (len(ename) + 8) * 7 + 18)
+        syn.append({
+            "id": f"epic-{ep.get('id', '')}",
+            "epic_id": ep.get("id", ""),
+            "n": pos_keys[i],
+            "name": ename,
+            "status": status,
+            "status_class": status,
+            "progress": roll,
+            "progress_pct": int(round(roll * 100)),
+            "landmark_svg": load_landmark(theme, ep.get("landmark", "house")),
+            "transform": positions[pos_keys[i]],
+            "label_width": label_w,
+            "label_x": -label_w // 2,
+            "child_count": len(members),
+            "has_children": True,
+            "child_count_plural": "" if len(members) == 1 else "s",
+            "is_main": True,
+            "is_side": False,
+        })
+    return syn
 
 
 def render_project(project: dict, theme: str) -> dict:
@@ -1286,7 +1377,16 @@ def render_project(project: dict, theme: str) -> dict:
             scope["default_quest_json"] = default_qid_json
             out[view] = _render(tmpl, scope, theme)
         else:
-            out[view] = _render(tmpl, project, theme)
+            scope = project
+            if view == "route":
+                epic_mains = _epic_route_mains(project, theme)
+                if epic_mains:
+                    scope = dict(project)
+                    scope["main_quests"] = epic_mains
+                    scope["side_quests"] = []
+                    scope["has_side_quests"] = False
+                    scope["side_quest_count"] = 0
+            out[view] = _render(tmpl, scope, theme)
     return out
 
 
@@ -1419,7 +1519,7 @@ def precompute_global_index(data: dict) -> dict:
             "icon_kind": icon_kind,
             "icon_svg": icon_svg,
             "route_href": f"{pid}/route.html",
-            "log_href": f"{pid}/quest-log.html",
+            "log_href": f"{pid}/quest-log.html",  # MASTER-VIEW injects into this page in-place when enabled (reversible)
         })
 
     return {"projects_list": projects_list, "totals": totals}
@@ -1508,6 +1608,29 @@ def render_all() -> int:
             print(f"  alt-themes: solar + worldmap rendered for {len(data['projects'])} project(s)")
     except Exception as exc:
         print(f"  WARN: alt-theme render failed (default theme still OK): {exc}", file=sys.stderr)
+
+    # MASTER-VIEW (additive + reversible). Emits <proj>/master-log.html for any
+    # project with `epics` + `master_view_enabled`. Runs AFTER quest-log.html is
+    # written (it reuses that file's head+header for exact theme match). Gated by
+    # the kill file ~/.claude/quest/master-view-disabled. Lazy + try/except so it
+    # can NEVER break the core render. Revert fully = delete master_view.py + flip flag.
+    try:
+        if not (ROOT / "quest" / "master-view-disabled").exists():
+            import importlib.util
+            mv_path = THEMES.parent / "master_view.py"
+            if mv_path.exists():
+                spec = importlib.util.spec_from_file_location("_quest_master_view", mv_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                mv = 0
+                for pid, project in data["projects"].items():
+                    if project.get("master_view_enabled") and project.get("epics"):
+                        if mod.render_master_log(pid, project, SITE / pid):
+                            mv += 1
+                if mv:
+                    print(f"  master-view: rendered for {mv} project(s)")
+    except Exception as exc:
+        print(f"  WARN: master-view render failed (default theme still OK): {exc}", file=sys.stderr)
 
     print(f"OK — {rendered} project(s), {md_written} quest briefings rendered to {SITE}")
     return 0

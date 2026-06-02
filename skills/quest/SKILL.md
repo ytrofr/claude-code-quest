@@ -1,6 +1,6 @@
 ---
 name: quest
-description: "Manage RPG-style project roadmaps — central quests.json + themed HTML dashboard at http://localhost:8770. Use when adding/updating/completing a quest, switching a project's theme, or asking 'what's the status of my projects?'."
+description: "Manage RPG-style project roadmaps — quests.json + themed HTML dashboard at http://localhost:8770. Use when adding/updating/completing a quest, switching a project's theme, or asking 'what's the status of my projects?'."
 user-invocable: true
 allowed-tools: "Bash, Read"
 argument-hint: "<status|init|add|update|done|theme|style|render|reset|chapters> [args]"
@@ -248,6 +248,7 @@ All three failure modes encoded into I1/I2/I3.
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `/quest status`                                        | Print all projects, dashboard URL, theme list                                                      |
 | `/quest hygiene [project]`                             | Read-only noise audit: DUP-RISK collisions, stub quests, codename names (see Hygiene Cleanup Routine) |
+| `name_cleanup.py scan/html/apply --project P`          | Fix ugly codename NAMES → short thematic (goal stays in `desc`). Engine `~/.claude/skills/quest/name_cleanup.py` (see ✨ Name Cleanup Routine) |
 | `/quest init <project>`                                | Create new project entry                                                                           |
 | `/quest add <project> "<name>"`                        | Append a quest                                                                                     |
 | `/quest update <project> <quest>`                      | Patch progress, next step, name, links, etc.                                                       |
@@ -611,6 +612,94 @@ Reports four buckets: **DUP-RISK** plan collisions (codename stub + real twin on
 - DON'T remove/retire anything without explicit I1 authorization.
 - DON'T rename a quest's `id` (only `name`).
 - DON'T run `quest reset --chapter` to "clean up" — it archives ALL done+current (sparing only locked) and will nuke in-flight work. This routine is surgical; chapter-reset is not.
+
+## ✨ Name Cleanup Routine — Short Thematic Names, Goal Lives in `desc`
+
+Sibling to the Hygiene routine, but about NAME QUALITY, not dup-stubs. The map fills with ugly machine names: bare `Entry NNN <titlecased slug>` auto-stubs and whimsical plan-mode codenames (`We Have Create Tthe Fizzy Dove`). This routine fixes the display `name` only.
+
+### NL triggers
+- "clean up quest names / fix the codename quests / the names are ugly / make the quest names readable" → this routine
+
+### Philosophy (operator-set, OGAS 2026-06-02)
+- **`name` = SHORT thematic label** (≤ ~5 words, human-readable). It's the card TITLE. Operator's loved examples: "Analytics Agent Platform", "Web Generation", "Nova Marketplace Landing".
+- **goal/mission lives in `desc`** — the dashboard ALREADY renders `desc` as the card subtitle. Never cram the goal/mission into the name (no long sentences as names).
+- **`id` is immutable** — it anchors plan-card URLs, session claims (`/quest claim`), and `depends_on`. NEVER change it. Only `name` changes (display-only, reversible).
+- A name is **bad** only when it's a machine artifact: a bare `Entry NNN <slug>` stub, OR a whimsical codename whose slug == the id. Names that already read as a goal/theme (have a `—`/`:`/`#NNN` separator + length) are LEFT ALONE.
+- The short NAME itself is **human/Claude judgment** — the script's auto-suggestions are a STARTING POINT, edit them to the operator's style.
+
+### The 4-step routine (engine: `~/.claude/skills/quest/name_cleanup.py`)
+```bash
+# 1. SCAN — detect flagged quests + best-effort short-name suggestions -> proposals JSON + table
+python3 ~/.claude/skills/quest/name_cleanup.py scan --project <proj>
+#    -> writes ~/.claude/quest/run/name-cleanup-proposals.json
+# 2. EDIT the proposals JSON — make each `suggested` a SHORT thematic name (your style)
+# 3. HTML PREVIEW — before/after rendered as name + goal-subtitle; operator EYEBALLS (visual-first gate)
+python3 ~/.claude/skills/quest/name_cleanup.py html --project <proj> --port 8788
+setsid python3 -m http.server 8788 --directory /tmp/claude/quest-name-cleanup >/dev/null 2>&1 &
+#    -> http://localhost:8788/   (operator confirms before apply)
+# 4. APPLY — name-only updates via quest.py (id + desc untouched), auto-re-renders
+python3 ~/.claude/skills/quest/name_cleanup.py apply --project <proj> --in ~/.claude/quest/run/name-cleanup-proposals.json
+```
+
+### Hard invariants
+1. **`name` only** — never touch `id` or `desc`. The goal stays in `desc` (the subtitle).
+2. **Visual-eyeball gate before apply** — always serve the HTML before/after and get the operator's OK (`.claude/rules/visual-diff-first.md`). `apply` is reversible (set `name` back) but the eyeball is the gate.
+3. **Don't expand good names** — if a name already reads as a goal/theme, leave it. Over-flagging good short names ("Web Generation") was the original mistake.
+4. **Suggestions are drafts** — `scan` proposes mechanically; the SHORT thematic name is operator/Claude judgment. Edit the JSON before `apply`.
+5. **`apply` skips unedited placeholders** (`(EDIT ME …)` / `(ASK …)`) — so a half-edited proposals file is safe.
+
+### Going forward
+Create new quests with a short thematic `name` + the 1-sentence goal in `desc`. The autosync default still pulls the plan H1 (often long) — when it produces a long/codename name, run this routine.
+
+## 🗺️ Master Quest View — the CANONICAL presentation (route map + quest-log + picker)
+
+For roadmaps with many quests (OGAS had 36 active / 135 total), a flat card grid is spam. The **master view** groups every quest under a handful of **master plans** (epics). **This is the default, source-of-truth presentation for every project that defines `epics` + `master_view_enabled`** — it governs all THREE dashboard surfaces, not just the quest log. Origin: OGAS 2026-06-02 (operator: "only main quests, click → popup with sub-quests"; extended to the route map + picker + project routing the same day). Worldmap-tuned today; other themes opt in later.
+
+### The 3 master surfaces (all driven off `epics`)
+
+| Surface | What master-view does | Click target |
+|---|---|---|
+| **route.html** (overworld map) | Road landmarks ARE the epics — one clean pin per master (≤9 slots, short names → no label overlap), each with a sub-quest **count badge** + rolled-up progress + derived status. Replaces the old `n`-keyed pins that collided and surfaced stale #1..#9 quests as "mains". | pin → `quest-log.html#epic-<id>` (auto-opens that master's popup) |
+| **quest-log.html** (master board) | Opens to the master cards (default-visible); `Master quests \| All quests` switch; any filter/search drops to the flat grid. | card → popup of its sub-quests → `plan-card.html?q=<id>` |
+| **plan-card.html** (active-picker bar) | The top picker collapses to the MASTER quests — one entry per epic with active work (`<name> (<active-count>)`) — instead of listing every current quest. | entry → that master's lead current sub-quest |
+
+**Project routing**: `http://localhost:8770/<project>/` serves that project's **`route.html`** (the overworld map) for every project; root `/` still serves the global Trainer-Hall index (`server.py::do_GET` rewrite).
+
+**Progress-bar gotcha (canonical)**: every popup/grid progress-FILL element MUST be `display:block`. An inline `<span>` fill ignores `width`/`height`, so 0% and 100% render identically (empty). Caught OGAS 2026-06-02 — the popup bars looked dead until `.qm-fill`/`.sq-fill` got `display:block`.
+
+### Data model (per project, in `quests.json`)
+```jsonc
+"projects": { "<id>": {
+  "master_view_enabled": true,           // gate (reversible)
+  "epics": [
+    { "id": "beacon", "name": "Beacon Pilot", "landmark": "tower",
+      "tagline": "Org page → 3 variations → leads + agent + analytics" }
+    // ... one per master plan
+  ],
+  "quests": [ { "id": "...", "epic": "beacon", ... } ]   // each quest tags its master
+}}
+```
+- **`epics[]`** = master metadata: `id` · `name` (short thematic) · `landmark` (theme drawing: house/tower/mill/bridge/camp/cave/castle) · `tagline` (1 line, shown under the name + in the popup head).
+- **`epic`** on each quest = its master's id. Membership is derived from this field; rollup % = mean of a master's members; "in flight" = members with 0<progress<1.
+- A quest with no `epic` simply won't appear in the master grid (still in the flat list).
+
+### Renderer (additive + reversible)
+- **quest-log board** — `master_view.py::render_master_log(pid, project, site_dir)` **injects** the master board into the freshly-rendered `quest-log.html` — it does NOT replace the page. Kept verbatim: header, XP bar, Active/Visited/Sealed, Show-All/Active-Only/All, search, the full flat card grid + all its JS. Added: a `Master quests | All quests` switch, the master-card grid (default-visible), and a click-popup per master (sub-quests → `plan-card.html?q=<id>`, clickable). Any filter/search interaction drops to the flat list; "Master quests" switches back. Each modal carries `data-epic="<id>"` + an on-load hash reader so `quest-log.html#epic-<id>` auto-opens that popup (the route-map deep-link target). `render.py` calls it as a **lazy try/except post-step** — can never break the core render. Also writes a `master-log.html` alias.
+- **route map** — `render.py::_epic_route_mains(project, theme)` builds one synthetic main-pin per epic and is applied **only to the route view's scope** (never mutates the shared project, so quest-log/plan-card are untouched). Returns `[]` (→ legacy `n`-keyed pins) unless `master_view_enabled` + `epics`.
+- **active-picker** — `render.py::_render_quest_blocks` builds the picker from epics-with-active-work when `master_view_enabled` + `epics`; else the legacy "list every current quest" bar.
+- **project routing** — `server.py::do_GET` rewrites `/<project>/` → `/<project>/route.html` when that file exists; root `/` untouched.
+
+### Reversibility (all tested) — every surface falls back cleanly
+1. Per-project: `master_view_enabled: false` → `/quest render` → quest-log reverts to flat, route map reverts to legacy `n`-keyed pins, picker reverts to the full current-quest list.
+2. Global kill switch: `touch ~/.claude/quest/master-view-disabled` → render → all projects flat (no data change). (Note: kills the quest-log board; the route/picker also no-op without `epics`.)
+3. Code: `git checkout render.py master_view.py server.py themes/worldmap/route.html.tmpl`. The flat grid lives INSIDE the injected page, so nothing is ever lost.
+- A project **without** `epics`/`master_view_enabled` is unaffected by all of the above — it gets the legacy flat quest-log, `n`-keyed route pins, and full-current-list picker.
+
+### Add it to a project
+1. Add `epics[]` + set `epic` on each quest (group by theme; names short, taglines 1-line) + `master_view_enabled: true`.
+2. `/quest render`. All three surfaces light up at once: the route map shows one clean landmark per epic, the quest-log opens to the master board, and the plan-card picker collapses to masters. `localhost:8770/<project>/` opens the route map.
+- **Curate epics by eyeball** (like the OGAS rollout) — don't auto-group blindly; bad groupings read worse than flat. Best for large roadmaps (15+ active); small projects (<~10 active) are fine flat.
+- **`epic` is set in `quests.json` directly** (not a CLI flag) — it's the one quest field edited by hand. Keep epic `name`s short (they become route-map labels — long names re-introduce overlap).
 
 ## Icon system — modular UI components
 
