@@ -30,6 +30,7 @@ RENDER = ROOT / "skills" / "quest" / "render.py"
 RUN = ROOT / "quest" / "run"  # Per-session claim files live here
 CONFIG = ROOT / "quest" / "config.json"
 DASHBOARD_URL = "http://localhost:8770"
+REBIND_LOG = ROOT / "quest" / "log" / "rebind.jsonl"  # shared with url/prompt rebind hooks
 
 
 # ---- Session identity (claim/unclaim) ----
@@ -249,6 +250,96 @@ def cmd_init(args) -> int:
     return render_now()
 
 
+# --- Epic (master quest) resolution — the "quest DNA": no quest is ever ungrouped. ---
+# Resolution order: explicit --epic > --new-epic (creates) > keyword match vs existing > Backlog floor.
+BACKLOG_EPIC = {
+    "id": "backlog", "name": "Backlog", "landmark": "camp",
+    "tagline": "Unsorted quests — give them a real master with --epic/--new-epic or `quest reepic --apply`",
+}
+
+
+def _epic_text(e: dict) -> str:
+    return f"{e.get('name', '')} {e.get('tagline', '')}".lower()
+
+
+def _quest_text(q: dict) -> str:
+    return f"{q.get('name', '')} {q.get('desc', '')} {' '.join(q.get('tags') or [])}".lower()
+
+
+def _match_epic(qtext: str, epics: list, min_score: int = 2):
+    """Keyword-overlap match a quest's text against existing epics. Returns epic id or None.
+    An epic id appearing as a quest word/tag is a strong (+3) signal."""
+    qwords = set(re.findall(r"[a-z0-9]{4,}", qtext))
+    best, best_score = None, 0
+    for e in epics:
+        if e.get("id") == BACKLOG_EPIC["id"]:
+            continue  # never auto-match INTO backlog; it is the floor only
+        ewords = set(re.findall(r"[a-z0-9]{4,}", _epic_text(e)))
+        score = len(qwords & ewords) + (3 if e.get("id", "") in qwords else 0)
+        if score > best_score:
+            best, best_score = e.get("id"), score
+    return best if best_score >= min_score else None
+
+
+def ensure_epic(project: dict, epic_id=None, new_epic_name=None,
+                landmark=None, tagline=None, quest=None) -> str:
+    """Guarantee a master-quest (epic) id for a quest. Creates epics as needed.
+    NEVER returns None — the Backlog floor catches everything else (the DNA invariant)."""
+    epics = project.setdefault("epics", [])
+    have = lambda eid: any(e.get("id") == eid for e in epics)  # noqa: E731
+    if epic_id:
+        if not have(epic_id):
+            sys.exit(f"ERROR: master quest (epic) '{epic_id}' not found in "
+                     f"'{project.get('name', '?')}'. Use --new-epic \"<name>\" to create it, "
+                     f"or pick an existing one.")
+        return epic_id
+    if new_epic_name:
+        eid = slug(new_epic_name)
+        if not have(eid):
+            epics.append({"id": eid, "name": new_epic_name,
+                          "landmark": landmark or "castle",
+                          "tagline": tagline or new_epic_name})
+        return eid
+    if quest is not None:
+        m = _match_epic(_quest_text(quest), epics)
+        if m:
+            return m
+    if not have(BACKLOG_EPIC["id"]):
+        epics.append(dict(BACKLOG_EPIC))
+    return BACKLOG_EPIC["id"]
+
+
+def cmd_reepic(args) -> int:
+    """Resolve+assign a master quest (epic) to every ungrouped quest. Preview by default."""
+    data = load()
+    project = get_project(data, args.project_id)
+    epics = project.setdefault("epics", [])
+    ungrouped = [q for q in project["quests"] if not q.get("epic")]
+    if not ungrouped:
+        print(f"All quests in '{args.project_id}' already have a master. Nothing to do.")
+        return 0
+    plan = []
+    for q in ungrouped:
+        m = _match_epic(_quest_text(q), epics)
+        plan.append((q, m or BACKLOG_EPIC["id"], "match" if m else "-> Backlog (floor)"))
+    print(f"{len(plan)} ungrouped quest(s) in '{args.project_id}':\n")
+    for q, target, how in plan:
+        print(f"  {q['id']:44.44}  {target:14}  {how}")
+    matched = sum(1 for _, _, how in plan if how == "match")
+    print(f"\n  {matched} matched to an existing master | {len(plan) - matched} -> Backlog floor")
+    if not args.apply:
+        print("\nPREVIEW only — re-run with --apply to write these assignments.")
+        return 0
+    for q, target, _ in plan:
+        q["epic"] = target
+    if any(t == BACKLOG_EPIC["id"] for _, t, _ in plan) and \
+       not any(e.get("id") == BACKLOG_EPIC["id"] for e in epics):
+        epics.append(dict(BACKLOG_EPIC))
+    save(data)
+    print(f"\nApplied: {len(plan)} quest(s) now have a master.")
+    return render_now()
+
+
 def cmd_add(args) -> int:
     data = load()
     project = get_project(data, args.project_id)
@@ -273,9 +364,21 @@ def cmd_add(args) -> int:
         "plan": args.plan or "",
         "next_step": args.next or "",
     }
+    # DNA: every quest belongs to a master quest (epic) — never ungrouped.
+    quest["epic"] = ensure_epic(
+        project,
+        epic_id=getattr(args, "epic", None),
+        new_epic_name=getattr(args, "new_epic", None),
+        landmark=getattr(args, "epic_landmark", None),
+        tagline=getattr(args, "epic_tagline", None),
+        quest=quest,
+    )
     project["quests"].append(quest)
     save(data)
-    print(f"Added: {args.project_id}/{qid} (#{n}, {landmark}, {status})")
+    _master = quest["epic"]
+    _warn = "  WARN: Backlog floor — pass --epic/--new-epic for a real master" \
+        if _master == BACKLOG_EPIC["id"] else ""
+    print(f"Added: {args.project_id}/{qid} (#{n}, {landmark}, {status}) -> master: {_master}{_warn}")
 
     # Auto-claim THIS session for the newly-added quest — prevents stale-claim
     # drift where a long-running CC session keeps an old claim while the
@@ -603,7 +706,9 @@ def cmd_todo(args) -> int:
             print('(no sidecar yet — add one with: quest.py todo add <proj> <quest> "...")')
         return 0
 
-    # Interpret the trailing args per action.
+    # Interpret the trailing args per action. Defaults keep the names bound on
+    # every path (each branch below either assigns or sys.exit()s).
+    text_arg, n_arg = "", 0
     if action in ("add", "note"):
         text_arg = " ".join(rest).strip()
         if not text_arg:
@@ -712,9 +817,113 @@ def _kebab(s: str) -> str:
     return s.strip("-")
 
 
+def _log_plan_anchor(sk, plan_path, project_id, quest_id, acted) -> None:
+    """Append one plan_anchor event to rebind.jsonl (best-effort, json.dumps)."""
+    try:
+        import datetime as _dt
+        REBIND_LOG.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps({
+            "ts": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sk": sk or "",
+            "event": "plan_anchor",
+            "plan": str(plan_path),
+            "project": project_id or "",
+            "qid": quest_id or "",
+            "acted": acted,
+        })
+        with REBIND_LOG.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
+def _resolve_quest_by_plan(plan_path: Path, data: dict):
+    """Deterministic plan→quest resolution for the plan-anchor auto-claim.
+
+    Matching mirrors autosync (quests store `plan` as the bare file NAME;
+    a minority carry absolute paths): a quest matches when status=="current"
+    AND its plan equals the basename OR the absolute path. Scope is the
+    project autosync's detect_project() resolves; when no project resolves,
+    all projects are searched. Returns (project_id, quest_id, verdict) with
+    verdict in {match, no-match, ambiguous}. ≥2 candidates is a legitimate
+    MULTI-QUEST plan — never pick one.
+    """
+    basename = plan_path.name
+    abs_str = str(plan_path)
+    project_id = None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from autosync import detect_project
+        project_id = detect_project(plan_path)
+    except Exception:
+        project_id = None
+
+    def _matches(q) -> bool:
+        return q.get("status") == "current" and (q.get("plan") or "") in (basename, abs_str)
+
+    projects = data.get("projects", {})
+    if project_id and project_id in projects:
+        scope = [(project_id, q) for q in projects[project_id].get("quests", []) if _matches(q)]
+    else:
+        scope = [(pid, q) for pid, p in projects.items()
+                 for q in p.get("quests", []) if _matches(q)]
+    if not scope:
+        return (project_id, None, "no-match")
+    if len(scope) > 1:
+        # Specificity tie-break (deep-test 2026-06-11): autosync spawns
+        # bare-name codename stubs next to hand-curated quests whose `plan`
+        # is the ABS path of the same file. Exact-path equality is strictly
+        # more specific than basename equality — when exactly one quest names
+        # THIS exact path, it wins. Same-form ties stay ambiguous (MULTI-QUEST).
+        exact = [(pid, q) for pid, q in scope if (q.get("plan") or "") == abs_str]
+        if len(exact) == 1:
+            scope = exact
+        else:
+            return (project_id, None, "ambiguous")
+    pid, q = scope[0]
+    return (pid, q["id"], "match")
+
+
+def cmd_claim_plan(args) -> int:
+    """Plan-anchored auto-claim: bind THIS session to the quest whose `plan`
+    field matches the plan file just written. Deterministic — never guesses
+    (0 or ≥2 matches → no-op), honors the lock sidecar WITHOUT unlinking it
+    (unlike bare claim), idempotent. Always exits 0: this runs from a
+    PostToolUse hook and must never block."""
+    plan_path = Path(args.plan).expanduser()
+    key = session_key()
+    if not key:
+        _log_plan_anchor(None, plan_path, None, None, "no-session")
+        return 0
+    lock_path = claim_file_for(key).with_suffix(".quest.lock")
+    if lock_path.exists():
+        _log_plan_anchor(key, plan_path, None, None, "locked-skip")
+        return 0
+    data = load()
+    project_id, quest_id, verdict = _resolve_quest_by_plan(plan_path, data)
+    if verdict != "match":
+        _log_plan_anchor(key, plan_path, project_id, None, verdict)
+        return 0
+    cf = claim_file_for(key)
+    target = f"{project_id}/{quest_id}"
+    try:
+        if cf.exists() and cf.read_text(encoding="utf-8").strip() == target:
+            _log_plan_anchor(key, plan_path, project_id, quest_id, "noop")
+            return 0
+    except OSError:
+        pass
+    RUN.mkdir(parents=True, exist_ok=True)
+    cf.write_text(target + "\n", encoding="utf-8")
+    _log_plan_anchor(key, plan_path, project_id, quest_id, "claimed")
+    print(f"Plan-anchor claimed: {target}")
+    return 0
+
+
 def cmd_claim(args) -> int:
     """Bind THIS session to a quest. With no args, claims whatever
     auto-detect would pick (locks it in even when focus drifts)."""
+    if getattr(args, "plan", ""):
+        return cmd_claim_plan(args)
     # GC dead-session claim files on every claim (cheapest moment to sweep —
     # we're already writing run/ + the operator is intentionally touching the
     # claim layer).
@@ -1301,6 +1510,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--xp", type=int)
     s.add_argument("--plan", default="")
     s.add_argument("--next", default="")
+    s.add_argument("--epic", help="assign to an existing master quest (epic id)")
+    s.add_argument("--new-epic", dest="new_epic", help="create + assign a NEW master quest with this name")
+    s.add_argument("--epic-landmark", dest="epic_landmark", choices=LANDMARKS,
+                   help="landmark for --new-epic (default castle)")
+    s.add_argument("--epic-tagline", dest="epic_tagline", help="tagline for --new-epic")
     s.add_argument("--locked", action="store_true", help="add as locked even if no current exists")
     s.add_argument("--no-claim", dest="no_claim", action="store_true",
                    help="don't auto-claim this session for the new quest (default: auto-claim)")
@@ -1357,6 +1571,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("render", help="Regenerate all HTML")
     s.set_defaults(func=cmd_render)
+
+    s = sub.add_parser("reepic", help="Resolve+assign a master quest to every ungrouped quest (preview by default)")
+    s.add_argument("project_id")
+    s.add_argument("--apply", action="store_true", help="write the assignments (default: preview only)")
+    s.set_defaults(func=cmd_reepic)
 
     s = sub.add_parser("reset", help="Close current chapter — archive done/active quests, start fresh map")
     s.add_argument("project_id")
@@ -1422,6 +1641,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Session label to stamp on the quest (e.g. CC --name). Shown on dashboard title when it differs from quest id.")
     s.add_argument("--lock", action="store_true",
                    help="Prevent prompt-rebind hook from auto-switching this claim. Use /quest unlock to re-enable.")
+    s.add_argument("--plan", default="",
+                   help="Plan-anchor mode: claim the quest whose plan field matches this plan file "
+                        "(deterministic; no-op on 0/2+ matches or when this session is locked).")
     s.set_defaults(func=cmd_claim)
 
     s = sub.add_parser("unclaim", help="Remove THIS session's claim — revert to auto-detect")

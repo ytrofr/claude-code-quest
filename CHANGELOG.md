@@ -2,6 +2,16 @@
 
 All notable user-facing changes. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [Semantic Versioning](https://semver.org/).
 
+## [1.16.0] — 2026-06-11
+
+Plan-Anchored Auto-Claim — the session claim now follows the plan you're executing, deterministically.
+
+### Added
+
+- **`quest.py claim --plan <path>`** — resolves the quest whose `plan` field matches the written plan file (basename or absolute path, `status: current` only, project-scoped via autosync's `detect_project`). Never guesses: 0 matches → no-op; 2+ matches → no-op (`ambiguous` — MULTI-QUEST plans protected) with one deterministic exception: when exactly one quest names the exact absolute path, it beats basename-only matches (specificity tie-break — resolves the autosync-codename-stub vs hand-curated-twin collision). Honors a session lock WITHOUT unlinking it (unlike bare `claim`). Idempotent. Logs every decision to `rebind.jsonl` (`event=plan_anchor`, `acted ∈ claimed|noop|locked-skip|no-match|ambiguous`).
+- **`hooks/quest-plan-anchor-claim.sh`** — PostToolUse (Write|Edit) hook that fires `claim --plan` inline on plan-file writes. The deterministic successor to the IDF prompt-rebind guesser. Kill switches: `QUEST_PLAN_ANCHOR_DISABLED=1` or `touch ~/.claude/quest/plan-anchor-disabled`. Runs inline by design — backgrounding breaks the `/proc` session-identity walk.
+- **`test_plan_anchor.py`** — 9-case suite: exact match, lock survival (claim + lock untouched), never-guess (no-match / same-form ambiguity), specificity tie-break, idempotence.
+
 ## [1.15.0] — 2026-06-02
 
 Master Quest View becomes the **canonical multi-surface presentation** for any project that defines `epics` + `master_view_enabled` — it now governs the route map and the plan-card picker, not just the quest log. Plus a name-cleanup routine for tidy quest titles.
