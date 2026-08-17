@@ -385,7 +385,7 @@ def cmd_add(args) -> int:
     # operator pivots to a new work topic. Opt out with --no-claim or
     # env QUEST_AUTO_CLAIM_ON_ADD=0.
     # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
-    # actually working on nova-marketplace-landing; statusline showed the wrong
+    # actually working on a different quest; statusline showed the wrong
     # quest, operator only caught it by glancing at the card URL.
     try:
         no_claim = getattr(args, "no_claim", False) or \
@@ -461,7 +461,7 @@ def cmd_update(args) -> int:
     # of cmd_add's auto-claim. Closes the gap where /quest update X --status
     # current would NOT update the claim file, leaving the statusline stuck on
     # whatever the old claim pointed to (the 2026-05-14 entry-460 / 2026-05-15
-    # apollo-variant-engine recurrence both hit this). Opt out with
+    # the second recurrence both hit this). Opt out with
     # env QUEST_AUTO_CLAIM_ON_UPDATE=0.
     try:
         if args.status == "current":
@@ -785,8 +785,8 @@ def auto_detect_quest(cwd: str | None = None) -> tuple[str | None, str | None]:
     pid = None
     # Match prefix when cwd is exactly the prefix OR starts with `prefix`
     # followed by a separator (`/`, `-`, `_`). Lets one entry like
-    # `~/LimorAI` cover all worktrees `LimorAI-Limor`, `LimorAI-staging`,
-    # while rejecting `LimorAI2` / `LimorAIxyz`.
+    # `~/Apollo` cover all worktrees `Apollo-main`, `Apollo-staging`,
+    # while rejecting `Apollo2` / `Apolloxyz`.
     for prefix, candidate in _path_map():
         prefix = prefix.rstrip("/")
         if cwd == prefix or any(cwd.startswith(prefix + sep) for sep in ("/", "-", "_")):

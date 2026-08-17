@@ -72,8 +72,8 @@ quest_indicator() {
   # Tier 2: auto-detect from cwd (only if no explicit claim).
   # Match a path_map prefix when cwd is exactly the prefix OR starts with
   # `prefix` followed by a separator (`/`, `-`, `_`). Lets one entry like
-  # `$HOME/LimorAI` match all sibling worktrees `LimorAI-Limor`,
-  # `LimorAI-staging`, etc., while still rejecting `LimorAI2` / `LimorAIxyz`.
+  # `/home/you/Apollo` match all sibling worktrees `Apollo-main`,
+  # `Apollo-staging`, etc., while still rejecting `Apollo2` / `Apolloxyz`.
   if [ -z "$project" ] && [ -r "$config" ]; then
     project=$(jq -r --arg cwd "$cwd" '
       .path_map // [] | map(select(.path as $p |
@@ -103,8 +103,8 @@ quest_indicator() {
   # quest indefinitely. Discard the claim and fall through to Tier 2 (most-
   # recent-current auto-detect).
   # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
-  # operator was on nova-marketplace-landing. 2026-05-15 OGAS — same shape
-  # recurred with apollo-variant-engine creation: the prior session-key claim
+  # operator was on a different quest. Same shape
+  # recurred a day later on a newly created quest: the prior session-key claim
   # outlived the work-context pivot. This fix + auto-claim on /quest update
   # --status current (quest.py cmd_update) together close the recurrence.
   if [ -n "$project" ] && [ -n "$qid" ] && [ -r "$data" ]; then
@@ -145,7 +145,7 @@ quest_indicator() {
     # match the claimed quest id in either direction, prefix the tag with a
     # warning glyph. Catches long-running sessions whose claim drifted from
     # the current work topic. Disable with QUEST_STATUSLINE_MISMATCH_WARN=0.
-    # Evidence: 2026-05-14 OGAS — session named "nova" stayed bound to
+    # Evidence: 2026-05-14 — a session named after one quest stayed bound to
     # quest entry-460-real-ig-gallery-and-v3-scroll-extract for 2 days; this
     # glyph would have surfaced the mismatch instantly.
     # Canary-suppression sentinel: when ~/.claude/hooks/quest-url-rebind.sh

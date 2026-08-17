@@ -41,14 +41,14 @@ FIXTURE_QUESTS = {
                 {
                     "id": "nova-marketplace-landing",
                     "name": "Nova Marketplace Landing",
-                    "desc": "Investor kit landing page for Nova community marketplace",
+                    "desc": "Investor kit landing page for the Nova community marketplace",
                     "status": "current",
                     "tags": ["nova", "landing", "investors"],
                 },
                 {
                     "id": "apollo-variant-engine",
                     "name": "Apollo Variant Engine",
-                    "desc": "Multi-model variant engine for apollo inspiration phase 10 DNA",
+                    "desc": "Multi-model variant engine for the apollo inspiration phase",
                     "status": "current",
                     "tags": ["apollo", "variant", "phase-10"],
                 },
@@ -142,7 +142,7 @@ class TestDecideAction(unittest.TestCase):
         # (Stage 1) can rebind. This was the rampant claim-drift bug.
         r = scorer.decide_action(
             "yes lets do it",
-            "I propose investigating the nova investors landing page layout",
+            "I propose investigating the nova marketplace landing page layout",
             self.docs, self.idf,
         )
         self.assertEqual(r["action"], "suggest")
@@ -168,7 +168,7 @@ class TestDecideAction(unittest.TestCase):
     def test_conflict_guard_user_disagrees_with_context(self):
         # User says "nova" but prior context heavily favors mobile-layout
         r = scorer.decide_action(
-            "switch to nova investors landing",
+            "switch to nova marketplace landing",
             "Heavy work on mobile layout iframe cache viewport regression",
             self.docs, self.idf,
         )
