@@ -58,7 +58,7 @@ _FILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_\-]*(__[a-z0-9][a-z0-9_\-]*)?$")
 _WRITE_LOCK = threading.Lock()
 
 # Tag character whitelist: letters, digits, dash, underscore, dot, colon, slash.
-# Colon allows `session:limor:s2`, dot allows `v1.2`, slash for `area/auth`.
+# Colon allows `session:project-d:s2`, dot allows `v1.2`, slash for `area/auth`.
 _TAG_RE = re.compile(r"^[A-Za-z0-9_:./\-]{1,64}$")
 
 
@@ -89,8 +89,8 @@ def _resolve_edit_path(kind: str, file_id: str) -> Path | None:
     """Translate `kind` + identifier into an absolute Path under a known root.
     Returns None if kind is unknown or file_id fails the whitelist (path-traversal guard).
 
-    kind="backlog" + "ogas"          → BACKLOG_DIR / "ogas.md"
-    kind="notes"   + "ogas__some-id" → NOTES_DIR / "ogas__some-id.md"
+    kind="backlog" + "project-a"          → BACKLOG_DIR / "project-a.md"
+    kind="notes"   + "project-a__some-id" → NOTES_DIR / "project-a__some-id.md"
     """
     if not _FILE_ID_RE.match(file_id):
         return None

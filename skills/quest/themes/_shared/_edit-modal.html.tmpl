@@ -1,8 +1,8 @@
 <!-- Partial: _edit-modal — in-browser markdown editor for backlog + sidecar files.
      Called from any surface via: openQuestEditor(kind, fileId, label)
        kind    — "backlog" or "notes"
-       fileId  — for backlog: project id (e.g. "ogas")
-                 for notes:   "<proj>__<quest>" (e.g. "ogas__some-quest-id")
+       fileId  — for backlog: project id (e.g. "project-a")
+                 for notes:   "<proj>__<quest>" (e.g. "project-a__some-quest-id")
        label   — friendly title shown at top of modal
 
      Flow: GET /api/file/<kind>/<id> → fill textarea → Save POSTs back → server

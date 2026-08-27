@@ -384,7 +384,7 @@ def cmd_add(args) -> int:
     # drift where a long-running CC session keeps an old claim while the
     # operator pivots to a new work topic. Opt out with --no-claim or
     # env QUEST_AUTO_CLAIM_ON_ADD=0.
-    # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
+    # Evidence: 2026-05-14 ProjectA — session bound to entry-460 for 2 days while
     # actually working on a different quest; statusline showed the wrong
     # quest, operator only caught it by glancing at the card URL.
     try:

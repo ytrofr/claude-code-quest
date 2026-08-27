@@ -10,7 +10,7 @@ can flip themes from any project map.
 
 Usage:
   python3 ~/.claude/skills/quest/themes/alt_render.py                # all projects, both themes
-  python3 ~/.claude/skills/quest/themes/alt_render.py --project=ogas # one project
+  python3 ~/.claude/skills/quest/themes/alt_render.py --project=project-a # one project
   python3 ~/.claude/skills/quest/themes/alt_render.py --theme=solar  # one theme, all projects
   python3 ~/.claude/skills/quest/themes/alt_render.py --post-inject  # also inject switcher into existing route.html
 

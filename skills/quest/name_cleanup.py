@@ -2,7 +2,7 @@
 """Quest Name Cleanup — detect bad codename quest NAMES, propose short thematic
 names, preview before/after as HTML, and apply (name-only).
 
-PHILOSOPHY (operator-set, 2026-06-02 — OGAS):
+PHILOSOPHY (operator-set, 2026-06-02 — ProjectA):
   - `name` = SHORT thematic label (<= ~5 words), human-readable. The card title.
   - goal/mission lives in `desc` — the dashboard already renders it as the card subtitle.
   - NEVER cram the goal/mission into the name (no long sentences as names).
@@ -20,9 +20,9 @@ WORKFLOW (the routine):
   4. apply  -> name-only updates via quest.py (id + desc untouched); re-renders the dashboard
 
 Usage:
-  name_cleanup.py scan  --project ogas [--out PROPOSALS.json]
-  name_cleanup.py html  --project ogas [--in PROPOSALS.json] [--port 8788]
-  name_cleanup.py apply --project ogas --in PROPOSALS.json
+  name_cleanup.py scan  --project project-a [--out PROPOSALS.json]
+  name_cleanup.py html  --project project-a [--in PROPOSALS.json] [--port 8788]
+  name_cleanup.py apply --project project-a --in PROPOSALS.json
 """
 import argparse, json, re, subprocess, sys, pathlib, html as _html
 

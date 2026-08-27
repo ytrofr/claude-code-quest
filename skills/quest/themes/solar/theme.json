@@ -5,7 +5,7 @@
   "description": "Cartoon kawaii solar systems. Each cluster of quests = a solar system with cartoon-faced sun (cluster lead) + planets (member quests). Black hole at center = long-term mission. Cream background, dark outlines, Fredoka font. Status by color (pink=current, gold=in-progress, teal=done, gray=planned).",
   "font": "Fredoka",
   "landmarks": ["sun", "planet", "moon", "blackhole", "comet", "nebula"],
-  "preview_url": "/mocks/ogas-real-solar.html",
+  "preview_url": "/mocks/project-a-real-solar.html",
   "cosmic_vocab": {
     "blackhole": "long-term project goal",
     "solar_system": "cluster of related quests (by tag/domain)",
@@ -32,10 +32,10 @@
     "_comment": "Positions are dynamic in this theme — clusters arranged radially around the central BH. See render strategy in route.html.tmpl when wired."
   },
   "wiring_steps_when_adopted": [
-    "1. Copy mocks/ogas-real-solar.html structure into themes/solar/route.html.tmpl with Jinja-style placeholders",
+    "1. Copy mocks/project-a-real-solar.html structure into themes/solar/route.html.tmpl with Jinja-style placeholders",
     "2. Add cluster-detection logic to render.py (group_quests_by_tag or _by_domain)",
     "3. Add theme registration to themes/_shared/README.md theme registry",
-    "4. Test render on OGAS first (preview at /ogas/route.html with theme=solar)",
+    "4. Test render on ProjectA first (preview at /project-a/route.html with theme=solar)",
     "5. Bump version to 1, remove status:PREVIEW field",
     "6. Document in MEMORY.md + quest-dashboard.md rule"
   ]

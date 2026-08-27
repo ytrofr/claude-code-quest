@@ -991,7 +991,7 @@ def precompute(project_id: str, project: dict, theme_meta: dict, live_claims_map
     # Split quests into main (full landmark rendering on the road) and side
     # (small constellation pins clustered around their parent main). Templates
     # iterate these separately so the visual hierarchy stays clean even with 70+
-    # quests in OGAS-scale projects.
+    # quests in ProjectA-scale projects.
     project["main_quests"] = [q for q in quests if q.get("is_main")]
     project["side_quests"] = [q for q in quests if q.get("is_side")]
     project["has_side_quests"] = bool(project["side_quests"])
@@ -1396,19 +1396,19 @@ def render_project(project: dict, theme: str) -> dict:
 # `accent` / `icon` fields on a project in quests.json. Fallback when a project
 # isn't in this map: rotate through ACCENT_PALETTE / ICON_ROTATION by index.
 DEFAULT_ACCENTS: dict[str, str] = {
-    "limor":    "#ff6a3a",
+    "project-d":    "#ff6a3a",
     "smith":    "#3aaa6a",
-    "ogas":     "#9a6ace",
+    "project-a":     "#9a6ace",
     "gamify":   "#e8b430",
-    "logivote": "#3a8aa0",
+    "project-e": "#3a8aa0",
     "remotion": "#c44a2a",
 }
 DEFAULT_ICONS: dict[str, str] = {
-    "limor":    "house",
+    "project-d":    "house",
     "smith":    "camp",
-    "ogas":     "castle",
+    "project-a":     "castle",
     "gamify":   "camp",
-    "logivote": "cave",
+    "project-e": "cave",
     "remotion": "tower",
 }
 ACCENT_PALETTE: list[str] = ["#ff6a3a", "#3aaa6a", "#9a6ace", "#e8b430", "#3a8aa0", "#c44a2a", "#5db4d8", "#ffd24a"]

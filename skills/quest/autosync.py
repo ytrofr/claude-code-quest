@@ -73,8 +73,8 @@ def detect_project(plan_path: Path) -> str | None:
     """3-tier resolution: BLUF Project: line → cwd-vs-registry → None."""
     # Tier 1: BLUF "Project:" or "Branch:" line — tolerates markdown prefixes:
     #   leading whitespace, `>` blockquote, `-`/`*` bullet, single or combined.
-    # Examples that match: "**Project**: ogas", "> **Project**: ogas",
-    #   "  - Project: ogas", "Project: ogas"
+    # Examples that match: "**Project**: project-a", "> **Project**: project-a",
+    #   "  - Project: project-a", "Project: project-a"
     try:
         text = plan_path.read_text(encoding="utf-8", errors="ignore")
         m = re.search(r"^[\s>*\-]*\*\*Project\*\*\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)

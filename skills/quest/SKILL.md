@@ -30,7 +30,7 @@ Visualize your projects as gamified RPG maps. Each project gets a themed dashboa
 
 ### Failure log — why this rule is in screaming red
 
-**2026-05-11 (OGAS, Phase 9 → Phase 10 pivot)**: Claude ran `quest reset ogas --chapter phase-9-archived --clean --yes` during a routine reset. Operator had NOT typed `--clean` and had NOT authorized wiping locked quests — they had asked for a "fresh new session" framing the Phase 10 pivot. The `--clean` flag archived 25 LOCKED future-work quests, including one (#21) the operator was actively waiting on. The loss only surfaced when they went looking for that quest and found it gone. Restoration required manual JSON patching of 25 entries. Operator's verbatim demand: **"YOU NEVER EVER EVER DO THIS UNLESS I SAY EXPLICITLY."** This was a VIOLATION of Safety Invariant I1 below, which already covered the case — Claude had the rule loaded and ran the command anyway. Making the rule more prominent and adding this failure log.
+**2026-05-11 (ProjectA, Phase 9 → Phase 10 pivot)**: Claude ran `quest reset project-a --chapter phase-9-archived --clean --yes` during a routine reset. Operator had NOT typed `--clean` and had NOT authorized wiping locked quests — they had asked for a "fresh new session" framing the Phase 10 pivot. The `--clean` flag archived 25 LOCKED future-work quests, including one (#21) the operator was actively waiting on. The loss only surfaced when they went looking for that quest and found it gone. Restoration required manual JSON patching of 25 entries. Operator's verbatim demand: **"YOU NEVER EVER EVER DO THIS UNLESS I SAY EXPLICITLY."** This was a VIOLATION of Safety Invariant I1 below, which already covered the case — Claude had the rule loaded and ran the command anyway. Making the rule more prominent and adding this failure log.
 
 ---
 
@@ -143,7 +143,7 @@ The hook also emits additionalContext directing the model that the FIRST tool ca
      ```
      For each hit, read tail 10 lines and surface in summary: `peer_activity: thread <basename> last <mtime> — "<last message excerpt>"`. If none: `peer_activity: none`. Fallback if no `active/` hits: grep aggregate `~/shared/inter-agent/log.jsonl` for last 5 entries mentioning the project.
 
-   The mtime-sort is critical — alphabetical order surfaces stale threads (`coord-limor-...` before `coord-sigma-s3-s4-20260506-...`). Recent peer activity is what matters for collision detection.
+   The mtime-sort is critical — alphabetical order surfaces stale threads (`coord-project-d-...` before `coord-sigma-s3-s4-20260506-...`). Recent peer activity is what matters for collision detection.
    - These probes COST <1 second total. They are how multi-session coord stays safe — peer s4 may have uncommitted work in shared files; bus scan catches it BEFORE you start work.
 
 6. **Summarize in ≤200 words** using the template below. Summary MUST include `git_verified` + `dogfood_reachable` + `peer_activity` lines (even if "yes/yes/none").
@@ -209,12 +209,12 @@ Begin? (yes / pick different / show more)
 
 ### Worked example
 
-Operator pastes `http://localhost:8770/ogas/plan-card.html?q=grid-layout-ui-mockup` in a fresh session.
+Operator pastes `http://localhost:8770/project-a/plan-card.html?q=grid-layout-ui-mockup` in a fresh session.
 
 Routine:
 
 ```
-1. Parse: proj=ogas, qid=grid-layout-ui-mockup
+1. Parse: proj=project-a, qid=grid-layout-ui-mockup
 2. Read ~/.claude/quest/data/quests.json → find quest #38, status=current, progress=0.85
 3. Read quest.plan: ~/.claude/plans/i-want-to-plan-pending-layout-queue.md (321 lines)
 4. MANDATORY git verify:
@@ -223,7 +223,7 @@ Routine:
    - git status --short → clean (or list uncommitted)
 5. MANDATORY live probes:
    - curl -sI -m 3 http://localhost:8000/api/v1/pages/published/... → HTTP 200 → dogfood_reachable: yes
-   - grep -l "grid-layout-ui-mockup\|ogas" ~/shared/inter-agent/active/*.md | head -3 →
+   - grep -l "grid-layout-ui-mockup\|project-a" ~/shared/inter-agent/active/*.md | head -3 →
      finds active/coord-sigma-s3-s4-20260506.md → tail 10 lines →
      peer_activity: thread coord-sigma-s3-s4-20260506 last 2026-05-11T14:04:32Z from sigma:s4 — "v2A v3 PIVOT landed locally. Operator: 'i dont like that the css inspector is a new panel...'"
 6. Summarize using template — INCLUDES git_verified + dogfood_reachable + peer_activity lines
@@ -234,9 +234,9 @@ Routine:
 
 ### Evidence — why these invariants exist
 
-2026-05-11 OGAS Entry #450:
+2026-05-11 ProjectA Entry #450:
 
-1. Phase 9 pivot session ran `quest reset ogas --chapter phase-7-8-archived` without operator-explicit command. All 34 in-flight OGAS quests archived. No soft-warn surfaced. Operator on next session interpreted as deletion — "where are all OGAS quests gone?!?!?!?!??!". Manual JSON restoration required.
+1. Phase 9 pivot session ran `quest reset project-a --chapter phase-7-8-archived` without operator-explicit command. All 34 in-flight ProjectA quests archived. No soft-warn surfaced. Operator on next session interpreted as deletion — "where are all ProjectA quests gone?!?!?!?!??!". Manual JSON restoration required.
 2. Same day, a quest was created as `i-want-to-plan-pending-layout-queue` — the plan FILE name. The actual plan H1 was different. Operator demanded the quest be named what the operator was thinking (`grid-layout-ui-mockup`).
 3. Earlier-created quests had only `--next "..."` populated — no `why`, `kpi`, `tasks[]`, `links[]`. Required full re-pack later when context was needed.
 
@@ -362,7 +362,7 @@ Preview output:
 
 ```
 PREVIEW (no changes made — pass --yes to commit):
-  project: limor
+  project: project-d
   chapter: 'phase-1-anchor'
   archive (5):
     [done   ] # 1 Anchor Town
@@ -602,7 +602,7 @@ Reports four buckets: **DUP-RISK** plan collisions (codename stub + real twin on
 ### Recurrence prevention (already in place)
 
 - `derive_quest` names new quests from the plan **H1** (not the codename) — fewer codename names going forward.
-- The `knowledge-quest-hygiene` weekly routine (OGAS Routines Platform) re-flags DUP-RISK + codename counts so noise self-surfaces.
+- The `knowledge-quest-hygiene` weekly routine (ProjectA Routines Platform) re-flags DUP-RISK + codename counts so noise self-surfaces.
 - **Best fix is upstream**: name the plan FILE to match the intended quest `id` so autosync UPDATES the right quest instead of spawning a twin (Safety Invariant I2).
 
 ### Forbidden during this routine
@@ -620,7 +620,7 @@ Sibling to the Hygiene routine, but about NAME QUALITY, not dup-stubs. The map f
 ### NL triggers
 - "clean up quest names / fix the codename quests / the names are ugly / make the quest names readable" → this routine
 
-### Philosophy (operator-set, OGAS 2026-06-02)
+### Philosophy (operator-set, ProjectA 2026-06-02)
 - **`name` = SHORT thematic label** (≤ ~5 words, human-readable). It's the card TITLE. Operator's loved examples: "Analytics Agent Platform", "Web Generation", "Nova Marketplace Landing".
 - **goal/mission lives in `desc`** — the dashboard ALREADY renders `desc` as the card subtitle. Never cram the goal/mission into the name (no long sentences as names).
 - **`id` is immutable** — it anchors plan-card URLs, session claims (`/quest claim`), and `depends_on`. NEVER change it. Only `name` changes (display-only, reversible).
@@ -653,7 +653,7 @@ Create new quests with a short thematic `name` + the 1-sentence goal in `desc`. 
 
 ## 🗺️ Master Quest View — the CANONICAL presentation (route map + quest-log + picker)
 
-For roadmaps with many quests (OGAS had 36 active / 135 total), a flat card grid is spam. The **master view** groups every quest under a handful of **master plans** (epics). **This is the default, source-of-truth presentation for every project that defines `epics` + `master_view_enabled`** — it governs all THREE dashboard surfaces, not just the quest log. Origin: OGAS 2026-06-02 (operator: "only main quests, click → popup with sub-quests"; extended to the route map + picker + project routing the same day). Worldmap-tuned today; other themes opt in later.
+For roadmaps with many quests (ProjectA had 36 active / 135 total), a flat card grid is spam. The **master view** groups every quest under a handful of **master plans** (epics). **This is the default, source-of-truth presentation for every project that defines `epics` + `master_view_enabled`** — it governs all THREE dashboard surfaces, not just the quest log. Origin: ProjectA 2026-06-02 (operator: "only main quests, click → popup with sub-quests"; extended to the route map + picker + project routing the same day). Worldmap-tuned today; other themes opt in later.
 
 ### The 3 master surfaces (all driven off `epics`)
 
@@ -665,7 +665,7 @@ For roadmaps with many quests (OGAS had 36 active / 135 total), a flat card grid
 
 **Project routing**: `http://localhost:8770/<project>/` serves that project's **`route.html`** (the overworld map) for every project; root `/` still serves the global Trainer-Hall index (`server.py::do_GET` rewrite).
 
-**Progress-bar gotcha (canonical)**: every popup/grid progress-FILL element MUST be `display:block`. An inline `<span>` fill ignores `width`/`height`, so 0% and 100% render identically (empty). Caught OGAS 2026-06-02 — the popup bars looked dead until `.qm-fill`/`.sq-fill` got `display:block`.
+**Progress-bar gotcha (canonical)**: every popup/grid progress-FILL element MUST be `display:block`. An inline `<span>` fill ignores `width`/`height`, so 0% and 100% render identically (empty). Caught ProjectA 2026-06-02 — the popup bars looked dead until `.qm-fill`/`.sq-fill` got `display:block`.
 
 ### Data model (per project, in `quests.json`)
 ```jsonc
@@ -698,7 +698,7 @@ For roadmaps with many quests (OGAS had 36 active / 135 total), a flat card grid
 ### Add it to a project
 1. Add `epics[]` + set `epic` on each quest (group by theme; names short, taglines 1-line) + `master_view_enabled: true`.
 2. `/quest render`. All three surfaces light up at once: the route map shows one clean landmark per epic, the quest-log opens to the master board, and the plan-card picker collapses to masters. `localhost:8770/<project>/` opens the route map.
-- **Curate epics by eyeball** (like the OGAS rollout) — don't auto-group blindly; bad groupings read worse than flat. Best for large roadmaps (15+ active); small projects (<~10 active) are fine flat.
+- **Curate epics by eyeball** (like the ProjectA rollout) — don't auto-group blindly; bad groupings read worse than flat. Best for large roadmaps (15+ active); small projects (<~10 active) are fine flat.
 - **`epic` is set in `quests.json` directly** (not a CLI flag) — it's the one quest field edited by hand. Keep epic `name`s short (they become route-map labels — long names re-introduce overlap).
 
 ## Icon system — modular UI components
@@ -745,8 +745,8 @@ Tag shortening — long quest ids truncate at 22 chars with `…`:
 
 | Tag                                | URL it opens                                                                    |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
-| `quest:ogas/layout-editor-entry-…` | `http://localhost:8770/ogas/plan-card.html?q=layout-editor-entry-435-soak-ship` |
-| `quest:ogas/-` (no current quest)  | `http://localhost:8770/ogas/`                                                   |
+| `quest:project-a/layout-editor-entry-…` | `http://localhost:8770/project-a/plan-card.html?q=layout-editor-entry-435-soak-ship` |
+| `quest:project-a/-` (no current quest)  | `http://localhost:8770/project-a/`                                                   |
 | `quest:-` (no project from cwd)    | `http://localhost:8770/`                                                        |
 
 ### Recommended SessionEnd hook (auto-unclaim)
@@ -797,11 +797,11 @@ Output comparison:
 
 ```
 # Default (2-line — requires ~30+ row terminal):
-AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1
+ProjectC | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1
 quest: smith/whatsapp-auth-split · audit-gap-closure  →  http://localhost:8770/...
 
 # Compact (1-line — fits any terminal):
-AgentSmith | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1 | quest: smith/whatsapp-auth-split · audit-gap-closure
+ProjectC | Opus 4.7 | 5h:71%→14:00 7d:44% | bus:smith:s3●→s1 | quest: smith/whatsapp-auth-split · audit-gap-closure
 ```
 
 ### Files involved
@@ -836,7 +836,7 @@ A quest's `depends_on_str` resolves ids to "#N name" format automatically. Unres
 **Auto-suggested**: when autosync adds a NEW quest whose plan body mentions an existing quest by id (e.g. `` `build-foo` ``) or full name AND the BLUF lacks `**Depends on**:`, autosync logs a hint to `~/.claude/quest/logs/autosync.log`:
 
 ```
-HINT limor/new-quest: plan mentions existing quest(s) ['build-foo'] —
+HINT project-d/new-quest: plan mentions existing quest(s) ['build-foo'] —
 add `> **Depends on**: build-foo` to BLUF if sequential
 ```
 

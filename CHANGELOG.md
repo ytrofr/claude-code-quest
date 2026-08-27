@@ -177,7 +177,7 @@ Freeform `tags[]` per quest, in-page search, session ribbon on the card image, "
 ### Internal
 
 - `session_tags_html` is pre-rendered Python-side and injected via `{{{...}}}` triple-brace raw inject. The template engine's non-greedy `{{#each}}` regex doesn't support nested loops — same trick already used by `live_claims_html`.
-- Single shared tag validator: `^[A-Za-z0-9_:./\-]{1,64}$`. Colon allows `session:limor:s2`; dot allows `v1.2`; slash allows `area/auth`.
+- Single shared tag validator: `^[A-Za-z0-9_:./\-]{1,64}$`. Colon allows `session:project-d:s2`; dot allows `v1.2`; slash allows `area/auth`.
 
 ## [1.8.0] — 2026-05-14
 
@@ -389,7 +389,7 @@ No action required. Existing `quests.json` files render unchanged — quests wit
 ### Migration
 No action required. Existing `quests.json` files render unchanged. To customize a project's card look:
 ```bash
-/quest style limor --accent "#ff6a3a" --icon house
+/quest style project-d --accent "#ff6a3a" --icon house
 /quest style smith --accent ""        # clear back to default
 ```
 

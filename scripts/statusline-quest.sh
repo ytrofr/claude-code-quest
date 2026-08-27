@@ -102,7 +102,7 @@ quest_indicator() {
   # silently overrides the auto-detect path → statusline shows the wrong
   # quest indefinitely. Discard the claim and fall through to Tier 2 (most-
   # recent-current auto-detect).
-  # Evidence: 2026-05-14 OGAS — session bound to entry-460 for 2 days while
+  # Evidence: 2026-05-14 ProjectA — session bound to entry-460 for 2 days while
   # operator was on a different quest. Same shape
   # recurred a day later on a newly created quest: the prior session-key claim
   # outlived the work-context pivot. This fix + auto-claim on /quest update
